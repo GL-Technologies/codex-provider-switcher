@@ -6,17 +6,25 @@
 
 一个原生 macOS 工具，用于在 Codex 的 OpenAI 官方配置与多个 **OpenAI Responses API 兼容接口**之间切换。
 
-> 本项目与 OpenAI 无隶属或官方合作关系。
+> 本项目与 OpenAI 及应用中列出的各接口厂商均无隶属或官方合作关系。
 
 ## 主要功能
 
 - 保存多个 Provider 配置并快速切换。
-- 一键恢复切换前的 OpenAI 原始配置。
-- API Key 保存在 macOS 钥匙串。
+- 常用 AI 厂商视觉图标，并可根据名称和 Base URL 自动识别。
+- 原生 macOS UI，自动适配浅色/深色模式。
+- API Key 保存在 macOS 钥匙串，编辑时可查看。
 - 保存前可真实请求一次 `POST /responses` 测试连通性。
+- 一键恢复切换前的 OpenAI 原始配置。
 - 修改 `~/.codex/config.toml` 和 `~/.codex/.env` 前自动备份。
-- Codex 桌面端和 CLI 使用同一套用户级配置，因此都会随配置切换。
+- 首次运行检查 `~/.codex` 是否可正常访问，并提供 macOS“隐私与安全性”故障处理入口。
 - 支持英语、简体中文、繁体中文、日语、韩语和西班牙语界面。
+
+## macOS 权限
+
+正常情况下，本应用只需要访问当前用户目录下的 `~/.codex`，以及使用 macOS 钥匙串保存 API Key，**不要求默认开启“完全磁盘访问权限”**。
+
+首次启动会在 `~/.codex` 内创建并立即删除一个测试文件，用来确认配置目录可写。如果系统阻止访问，应用会提供“打开隐私与安全性”和“完全磁盘访问权限”按钮作为故障处理入口。
 
 ## 要求
 
@@ -29,6 +37,15 @@
 从 GitHub **Releases** 下载最新 macOS 版本，解压后将 **Codex Provider Switcher.app** 放入“应用程序”。
 
 当前公开 Release 使用 ad-hoc 签名，首次启动时 macOS 可能需要“右键 → 打开”。以后如果配置 Developer ID 和公证，可以改为正式签名发布。
+
+## 使用
+
+1. 第一次打开时完成 Codex 配置访问检查。
+2. 添加 Provider，填写名称、Base URL、模型 ID 和 API Key。
+3. 图标可自动识别，也可手动选择厂商。
+4. 点击“测试连接”验证 Responses API。
+5. 点击“切换”，并按提示重启 Codex。
+6. 要恢复官方配置时选择 OpenAI → “使用 OpenAI”。
 
 ## Xcode 构建
 
@@ -46,7 +63,7 @@ Codex Provider Switcher.xcodeproj
 ./scripts/build_app.command
 ```
 
-脚本要求安装完整 Xcode，而不是只有 Command Line Tools。产物在 `dist/`，构建日志在 `.build-app/build.log`。
+发布版本号来自仓库根目录的 `VERSION` 文件。脚本要求安装完整 Xcode，而不是只有 Command Line Tools。产物在 `dist/`，构建日志在 `.build-app/build.log`。
 
 ## 数据安全
 
