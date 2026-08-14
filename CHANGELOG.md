@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.8
+
+- Expanded GitHub README navigation to English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish.
+- Added dedicated Traditional Chinese, Japanese, Korean, and Spanish README files and refreshed the Simplified Chinese landing page.
+- Improved the repository homepage with a clearer product summary, release/platform badges, architecture overview, and a shorter quick-start flow.
+- Refined the macOS sidebar with a clearer active-provider indicator and a compact Auto Bridge status card.
+- Added a dedicated connection-status card to provider details, including direct/bridge state and the Auto Bridge switch.
+- Improved menu bar hierarchy with clearer icons for active route, provider switching, Settings, and Quit.
+- Reworked Settings into clearer native grouped sections with visual bridge state, credentials, storage, and security actions.
+
 ## 0.3.7
 
 - Added **Auto Bridge** as a first-class, default-on switch in the main sidebar, Settings, and menu bar.

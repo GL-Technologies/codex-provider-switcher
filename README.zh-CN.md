@@ -4,24 +4,48 @@
   <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher 图标">
 </p>
 
-一个原生 macOS 工具，用于在 Codex 的 OpenAI 官方配置与多个 OpenAI 协议兼容接口之间切换。
+<p align="center">
+  <strong>为 Codex 设计的原生 macOS 接口切换器与兼容桥接工具。</strong>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · 简体中文 · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+</p>
+
+<p align="center">
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-orange?logo=swift">
+  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Release" src="https://img.shields.io/github/v/release/GL-Technologies/codex-provider-switcher">
+</p>
+
+一个原生 macOS 工具，用于在 Codex 的 OpenAI 官方配置与多个 OpenAI 协议兼容接口之间快速切换。原生 Responses API 可以直接连接；只支持 Chat Completions 的接口则可通过内置 Auto Bridge 自动转换给 Codex 使用。
 
 > 本项目与 OpenAI 及应用中列出的各接口厂商均无隶属或官方合作关系。
 
-## 主要功能
+## 核心能力
 
-- 保存多个 Provider 并快速切换。
-- 自动探测 Base URL 与兼容的 `/models` 模型列表。
-- 自动检测 Responses API 与 Chat Completions。
-- 原生 Responses 接口直接连接 Codex。
-- **自动桥接**仅支持 Chat Completions 的接口，默认开启，无需另外安装代理。
-- 桥接支持普通函数工具、Codex 自定义/freeform 工具、tool search、namespace、常见 reasoning 输出与 token usage 转换。
-- App 重新启动后自动恢复正在使用的桥接路由。
-- macOS 菜单栏常驻图标，可查看当前接口、快速切换和开关自动桥接。
-- 一键恢复 OpenAI 原始配置。
-- 修改 `~/.codex/config.toml` 和 `~/.codex/.env` 前自动备份。
-- 原生 SwiftUI，自动适配浅色/深色模式。
-- 支持英语、简体中文、繁体中文、日语、韩语和西班牙语。
+- **一键切换接口**：OpenAI 与多个已保存 Provider 之间快速切换。
+- **自动桥接**：Chat-Completions-only 接口自动通过本地 Responses Bridge 使用，默认开启。
+- **自动能力检测**：先检测 Responses API，再检测 Chat Completions。
+- **模型探测**：兼容 `/models` 的接口可自动读取模型列表，不支持时仍可手动填写。
+- **Codex 工具兼容**：桥接支持普通函数、custom/freeform tools、tool search、namespace、常见 reasoning 输出与 usage 信息。
+- **菜单栏常驻**：无需反复打开主窗口即可查看状态、快速切换接口、开关桥接和进入设置。
+- **桥接自动恢复**：App 重新启动后，如果 Codex 仍指向 localhost，会恢复之前的桥接 Provider。
+- **配置保护**：修改 `~/.codex/config.toml` 与 `~/.codex/.env` 前自动备份。
+- **原生 SwiftUI**：适配浅色/深色模式，并支持英语、简体中文、繁体中文、日语、韩语和西班牙语。
+
+## 工作方式
+
+```text
+原生 Responses Provider
+Codex ─────────────────────────────→ Provider /responses
+
+仅 Chat Completions Provider
+Codex → 本地 Responses Bridge → Provider /chat/completions
+```
+
+Bridge 只监听 localhost。**关闭主窗口不会停止桥接**，菜单栏图标会让 App 继续运行；只有真正退出 App 后 Bridge 才会停止。
 
 ## 要求
 
@@ -35,19 +59,17 @@
 
 当前公开 Release 使用 ad-hoc 签名。如果首次打开被 macOS 阻止，请先尝试打开一次，然后进入 **系统设置 → 隐私与安全性**，找到 Codex Provider Switcher 并选择**仍要打开**。
 
-## 使用
+## 快速开始
 
 1. 添加接口，填写 Base URL、模型 ID 与 API Key。名称可以留空，保存时会自动生成。
 2. 接口支持时，可点击**探测模型**从 `/models` 自动读取模型列表。
 3. 点击**测试连接**。软件会先测试 Responses，再探测 Chat Completions。
-4. 点击**切换**：
+4. 点击**使用/切换**：
    - 原生 Responses → Codex 直接连接。
-   - 仅 Chat Completions → 默认自动启动本地 Bridge，再提供给 Codex。
+   - 仅 Chat Completions → Auto Bridge 自动启动本地转换后提供给 Codex。
 5. 按提示重新打开 Codex。
 6. 之后可以直接从 macOS 菜单栏快速切换接口。
-7. 需要恢复官方配置时，选择 OpenAI → 使用 OpenAI。
-
-使用桥接接口时，Codex Provider Switcher 需要保持运行。**主窗口可以关闭**，菜单栏图标会让 App 继续在后台运行；真正退出 App 后 Bridge 会停止。
+7. 需要恢复官方配置时，选择 OpenAI → **使用 OpenAI**。
 
 ## Base URL 与模型探测
 
@@ -57,7 +79,7 @@
 
 ## 自动桥接
 
-当前 Codex 使用 Responses API，但大量兼容接口仍只提供 Chat Completions。自动桥接的链路为：
+当前 Codex 使用 Responses API，但大量兼容接口仍只提供 Chat Completions。自动桥接链路为：
 
 ```text
 Codex
@@ -67,7 +89,7 @@ Codex
 厂商 /chat/completions
 ```
 
-Bridge 只监听 `127.0.0.1`。转换层已经覆盖普通消息、function tools、Codex custom/freeform tools、tool search、namespace、常见 reasoning 文本以及 usage，并会处理一些严格兼容网关对 system 消息和工具 schema 的限制。
+Bridge 只监听 `127.0.0.1`。转换层覆盖普通消息、function tools、Codex custom/freeform tools、tool search、namespace、常见 reasoning 文本与 usage，并处理部分严格兼容网关对 system 消息和工具 schema 的限制。
 
 详细设计和已知边界见 [docs/BRIDGE.md](docs/BRIDGE.md)。
 
@@ -115,7 +137,7 @@ GitHub Actions 会在发布前执行 Swift 单元测试和真实 Xcode macOS 构
 
 ## 开源兼容性参考
 
-0.3.7 的桥接兼容性审查参考了 MIT 开源项目 CC Switch 的 Codex 路由设计，但本项目使用独立的原生 Swift 实现。说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+桥接兼容性审查参考了 MIT 开源项目 CC Switch 的 Codex 路由设计，但本项目使用独立的原生 Swift 实现。说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## License
 
