@@ -60,6 +60,15 @@ final class ConfigManager {
         return text.contains(ConfigComposer.managedMarker) || ConfigComposer.legacyManagedMarkers.contains { text.contains($0) }
     }
 
+    /// Returns true only when the current top-level Codex provider selection resolves to
+    /// OpenAI/ChatGPT defaults. This is intentionally stricter than `!isManaged()` because
+    /// an unmanaged config can still select a third-party provider.
+    func isOpenAIConfigured() -> Bool {
+        guard FileManager.default.fileExists(atPath: configURL.path) else { return true }
+        guard let text = try? String(contentsOf: configURL, encoding: .utf8) else { return false }
+        return ConfigComposer.isOpenAIConfig(text)
+    }
+
     func activeProfileID() -> UUID? {
         if let text = try? String(contentsOf: configURL, encoding: .utf8) {
             for line in text.components(separatedBy: .newlines) {
@@ -112,32 +121,55 @@ final class ConfigManager {
 
     func switchToOpenAI() throws {
         try prepareDirectories()
-        guard isManaged() else {
-            try saveActiveState(ActiveState(mode: "openai", profileID: nil, updatedAt: Date()))
-            return
-        }
-        guard let metadata = loadBaselineMetadata() else {
-            throw NSError(domain: "ConfigManager", code: 4, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.missing_baseline")])
-        }
-
         try backupCurrent(reason: "restore")
 
-        if metadata.configExisted {
-            guard FileManager.default.fileExists(atPath: baselineConfigURL.path) else {
-                throw NSError(domain: "ConfigManager", code: 5, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.missing_baseline")])
-            }
-            try atomicWrite(Data(contentsOf: baselineConfigURL), to: configURL, permissions: 0o600)
+        let metadata = loadBaselineMetadata()
+
+        // Prefer the original baseline when available, but sanitize it instead of restoring
+        // byte-for-byte. Older releases could capture a third-party configuration as the
+        // baseline, which caused the app UI to report OpenAI while Codex still used that route.
+        let sourceConfig: String
+        if metadata?.configExisted == true,
+           FileManager.default.fileExists(atPath: baselineConfigURL.path),
+           let text = try? String(contentsOf: baselineConfigURL, encoding: .utf8) {
+            sourceConfig = text
+        } else if let text = try? String(contentsOf: configURL, encoding: .utf8) {
+            sourceConfig = text
         } else {
-            try? FileManager.default.removeItem(at: configURL)
+            sourceConfig = ""
         }
 
-        if metadata.envExisted {
-            guard FileManager.default.fileExists(atPath: baselineEnvURL.path) else {
-                throw NSError(domain: "ConfigManager", code: 6, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.missing_baseline")])
-            }
-            try atomicWrite(Data(contentsOf: baselineEnvURL), to: envURL, permissions: 0o600)
+        let officialConfig = ConfigComposer.buildOpenAIConfig(base: sourceConfig)
+        if officialConfig.isEmpty {
+            try? FileManager.default.removeItem(at: configURL)
         } else {
+            try atomicWrite(officialConfig + "\n", to: configURL, permissions: 0o600)
+        }
+
+        let sourceEnv: String
+        if metadata?.envExisted == true,
+           FileManager.default.fileExists(atPath: baselineEnvURL.path),
+           let text = try? String(contentsOf: baselineEnvURL, encoding: .utf8) {
+            sourceEnv = text
+        } else if let text = try? String(contentsOf: envURL, encoding: .utf8) {
+            sourceEnv = text
+        } else {
+            sourceEnv = ""
+        }
+
+        let officialEnv = ConfigComposer.buildEnvironment(base: sourceEnv, apiKey: nil)
+        if officialEnv.isEmpty {
             try? FileManager.default.removeItem(at: envURL)
+        } else {
+            try atomicWrite(officialEnv, to: envURL, permissions: 0o600)
+        }
+
+        guard isOpenAIConfigured() else {
+            throw NSError(
+                domain: "ConfigManager",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "Codex configuration still selects a custom model provider after restore."]
+            )
         }
 
         try saveActiveState(ActiveState(mode: "openai", profileID: nil, updatedAt: Date()))
