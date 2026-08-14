@@ -5,6 +5,7 @@ final class AppPreferences: ObservableObject {
         static let offerRestart = "offerRestartAfterSwitch"
         static let showKeys = "showKeysByDefault"
         static let accessSetupCompleted = "accessSetupCompleted"
+        static let autoBridge = "autoBridgeEnabled"
     }
 
     @Published var offerRestartAfterSwitch: Bool {
@@ -19,6 +20,10 @@ final class AppPreferences: ObservableObject {
         didSet { UserDefaults.standard.set(accessSetupCompleted, forKey: Keys.accessSetupCompleted) }
     }
 
+    @Published var autoBridgeEnabled: Bool {
+        didSet { UserDefaults.standard.set(autoBridgeEnabled, forKey: Keys.autoBridge) }
+    }
+
     init() {
         if UserDefaults.standard.object(forKey: Keys.offerRestart) == nil {
             offerRestartAfterSwitch = true
@@ -30,6 +35,12 @@ final class AppPreferences: ObservableObject {
             showKeysByDefault = true
         } else {
             showKeysByDefault = UserDefaults.standard.bool(forKey: Keys.showKeys)
+        }
+
+        if UserDefaults.standard.object(forKey: Keys.autoBridge) == nil {
+            autoBridgeEnabled = true
+        } else {
+            autoBridgeEnabled = UserDefaults.standard.bool(forKey: Keys.autoBridge)
         }
 
         accessSetupCompleted = UserDefaults.standard.bool(forKey: Keys.accessSetupCompleted)
