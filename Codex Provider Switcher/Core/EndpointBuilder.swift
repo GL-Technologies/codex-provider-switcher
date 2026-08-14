@@ -27,8 +27,8 @@ public enum EndpointBuilder {
     }
 
     /// Returns conservative Base URL candidates, ordered from most explicit to inferred.
-    /// We never replace an existing version path such as /v4. If the user entered only
-    /// a host/root path, /v1 is tried as a compatibility fallback.
+    /// Explicit paths are never replaced. For known vendors we prefer their documented
+    /// path, then try /v1 only when the user entered a host/root URL.
     public static func candidateBaseURLs(from rawURL: String, brand: ProviderBrand = .automatic) -> [URL] {
         guard let normalized = normalizedBaseURL(from: rawURL) else { return [] }
         var candidates: [URL] = []
@@ -42,11 +42,6 @@ public enum EndpointBuilder {
 
         append(normalized)
 
-        let path = normalized.path
-        if path.isEmpty || path == "/" {
-            append(appendingPath("v1", to: normalized))
-        }
-
         let resolvedBrand = brand == .automatic
             ? ProviderBrand.detected(name: "", baseURL: normalized.absoluteString)
             : brand
@@ -54,6 +49,11 @@ public enum EndpointBuilder {
            let presetURL = normalizedBaseURL(from: preset),
            presetURL.host?.lowercased() == normalized.host?.lowercased() {
             append(presetURL)
+        }
+
+        let path = normalized.path
+        if path.isEmpty || path == "/" {
+            append(appendingPath("v1", to: normalized))
         }
 
         return candidates
