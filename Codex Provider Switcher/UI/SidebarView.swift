@@ -7,10 +7,10 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             Section {
-                row(
+                providerRow(
                     title: "OpenAI",
                     subtitle: L10n.text("official.sidebar_subtitle"),
-                    systemImage: "sparkles",
+                    brand: .openAI,
                     active: store.isOpenAIActive,
                     warning: false
                 )
@@ -19,10 +19,10 @@ struct SidebarView: View {
 
             Section(L10n.text("sidebar.providers")) {
                 ForEach(store.profiles) { profile in
-                    row(
+                    providerRow(
                         title: profile.name,
                         subtitle: profile.model,
-                        systemImage: "network",
+                        brand: profile.resolvedBrand,
                         active: !store.isOpenAIActive && store.activeProfileID == profile.id,
                         warning: !store.hasKey(for: profile)
                     )
@@ -31,30 +31,60 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 8) {
+                Button {
+                    NotificationCenter.default.post(name: .addProviderRequested, object: nil)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.text("action.add_provider"))
+
+                Spacer()
+
+                Button {
+                    store.showAccessSetup()
+                } label: {
+                    Image(systemName: "lock.shield")
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.text("access.title"))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.bar)
+        }
     }
 
-    private func row(title: String, subtitle: String, systemImage: String, active: Bool, warning: Bool) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: systemImage)
-                .frame(width: 18)
-                .foregroundStyle(active ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).lineLimit(1)
+    private func providerRow(title: String, subtitle: String, brand: ProviderBrand, active: Bool, warning: Bool) -> some View {
+        HStack(spacing: 10) {
+            ProviderIconView(brand: brand, size: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer()
+
+            Spacer(minLength: 6)
+
             if warning {
-                Image(systemName: "key.slash")
+                Image(systemName: "key.slash.fill")
+                    .font(.caption)
                     .foregroundStyle(.orange)
                     .help(L10n.text("key.missing"))
             } else if active {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(Color.accentColor)
+                Circle()
+                    .fill(.green)
+                    .frame(width: 8, height: 8)
+                    .help(L10n.text("status.active"))
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
