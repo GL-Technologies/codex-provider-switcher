@@ -4,6 +4,7 @@ final class AppPreferences: ObservableObject {
     private enum Keys {
         static let offerRestart = "offerRestartAfterSwitch"
         static let showKeys = "showKeysByDefault"
+        static let accessSetupCompleted = "accessSetupCompleted"
     }
 
     @Published var offerRestartAfterSwitch: Bool {
@@ -12,6 +13,10 @@ final class AppPreferences: ObservableObject {
 
     @Published var showKeysByDefault: Bool {
         didSet { UserDefaults.standard.set(showKeysByDefault, forKey: Keys.showKeys) }
+    }
+
+    @Published var accessSetupCompleted: Bool {
+        didSet { UserDefaults.standard.set(accessSetupCompleted, forKey: Keys.accessSetupCompleted) }
     }
 
     init() {
@@ -26,5 +31,7 @@ final class AppPreferences: ObservableObject {
         } else {
             showKeysByDefault = UserDefaults.standard.bool(forKey: Keys.showKeys)
         }
+
+        accessSetupCompleted = UserDefaults.standard.bool(forKey: Keys.accessSetupCompleted)
     }
 }
