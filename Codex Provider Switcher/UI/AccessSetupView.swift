@@ -13,19 +13,19 @@ struct AccessSetupView: View {
                     .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.text("access.title"))
+                    Text(L10n.text("guide.title"))
                         .font(.title2.weight(.semibold))
-                    Text(L10n.text("access.subtitle"))
+                    Text(L10n.text("guide.subtitle"))
                         .foregroundStyle(.secondary)
                 }
             }
 
             VStack(spacing: 0) {
-                setupRow(number: "1", title: L10n.text("access.step_open"), detail: L10n.text("access.step_open_detail"))
+                setupRow(number: "1", title: L10n.text("guide.step_open"), detail: L10n.text("guide.step_open_detail"))
                 Divider().padding(.leading, 54)
-                setupRow(number: "2", title: L10n.text("access.step_security"), detail: L10n.text("access.step_security_detail"))
+                setupRow(number: "2", title: L10n.text("guide.step_security"), detail: L10n.text("guide.step_security_detail"))
                 Divider().padding(.leading, 54)
-                setupRow(number: "3", title: L10n.text("access.step_config"), detail: L10n.text("access.step_config_detail"))
+                setupRow(number: "3", title: L10n.text("guide.step_config"), detail: L10n.text("guide.step_config_detail"))
             }
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
@@ -34,7 +34,7 @@ struct AccessSetupView: View {
             }
 
             HStack(spacing: 10) {
-                Button(L10n.text("access.open_privacy")) {
+                Button(L10n.text("guide.open_security")) {
                     store.systemAccess.openPrivacyAndSecurity()
                 }
                 Spacer()
