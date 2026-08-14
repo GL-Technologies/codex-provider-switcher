@@ -15,6 +15,10 @@ struct ProviderDetailView: View {
         !store.isOpenAIActive && store.activeProfileID == profile.id
     }
 
+    private var detectedIncompatible: Bool {
+        testResult?.success == true && testResult?.codexCompatible == false
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -78,7 +82,8 @@ struct ProviderDetailView: View {
                 Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isActive || store.isBusy)
+            .disabled(isActive || store.isBusy || detectedIncompatible)
+            .help(detectedIncompatible ? L10n.text("test.chat_only_message") : "")
 
             Menu {
                 Button(L10n.text("action.edit"), action: onEdit)
