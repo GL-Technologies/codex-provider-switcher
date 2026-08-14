@@ -2,7 +2,8 @@ import Foundation
 
 enum L10n {
     static func text(_ key: String) -> String {
-        NSLocalizedString(key, tableName: "Localizable", bundle: .main, value: key, comment: "")
+        if let value = AdaptiveStrings.value(for: key) { return value }
+        return NSLocalizedString(key, tableName: "Localizable", bundle: .main, value: key, comment: "")
     }
 
     static func format(_ key: String, _ arguments: CVarArg...) -> String {
