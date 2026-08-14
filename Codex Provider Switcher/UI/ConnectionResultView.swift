@@ -10,10 +10,10 @@ struct ConnectionResultView: View {
 
     private var usable: Bool { report.codexCompatible || bridgeReady }
 
-    private var statusColor: Color {
-        if usable { return .green }
-        if report.success { return .orange }
-        return .red
+    private var tone: AppStatusTone {
+        if usable { return .success }
+        if report.success { return .warning }
+        return .danger
     }
 
     private var statusImage: String {
@@ -35,69 +35,89 @@ struct ConnectionResultView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: statusImage)
-                    .foregroundStyle(statusColor)
-                Text(displayTitle).fontWeight(.medium)
-                Spacer()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                AppIconTile(systemImage: statusImage, tone: tone, size: 38)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayTitle)
+                        .font(.body.weight(.semibold))
+                    Text(displayMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+
+                Spacer(minLength: 12)
+
                 if let ms = report.durationMilliseconds {
-                    Text("\(ms) ms").foregroundStyle(.secondary)
+                    Text("\(ms) ms")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            Text(displayMessage)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+            Divider()
 
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 Text(L10n.text("test.detected_protocol"))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(protocolName)
-                    .fontWeight(.medium)
+
+                AppStatusPill(
+                    text: protocolName,
+                    tone: report.codexCompatible ? .success : (bridgeReady ? .accent : .neutral)
+                )
 
                 if report.codexCompatible {
-                    statusBadge(L10n.text("bridge.direct_ready"), color: .green)
+                    AppStatusPill(text: L10n.text("bridge.direct_ready"), tone: .success, systemImage: "bolt.fill")
                 } else if bridgeReady {
-                    statusBadge(L10n.text("bridge.route_ready"), color: .green)
+                    AppStatusPill(text: L10n.text("bridge.route_ready"), tone: .accent, systemImage: "arrow.triangle.branch")
                 }
+
+                Spacer()
             }
-            .font(.caption)
 
             if let resolved = report.resolvedBaseURL {
-                Text("Base URL · \(resolved)")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                metadataRow(label: "Base URL", value: resolved)
             }
 
             if let code = report.statusCode {
-                Text("HTTP \(code) · \(report.endpoint)")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                metadataRow(label: "HTTP", value: "\(code) · \(report.endpoint)")
             }
 
             if let preview = report.responsePreview, !preview.isEmpty {
                 DisclosureGroup(L10n.text("test.response")) {
-                    Text(preview)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                        .padding(.top, 4)
+                    ScrollView(.horizontal) {
+                        Text(preview)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .padding(.top, 6)
+                    }
                 }
                 .font(.caption)
             }
         }
-        .padding(12)
-        .background(statusColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+        .padding(14)
+        .background(tone.color.opacity(0.07), in: RoundedRectangle(cornerRadius: AppDesign.compactRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.compactRadius, style: .continuous)
+                .strokeBorder(tone.color.opacity(0.16), lineWidth: 1)
+        }
     }
 
-    private func statusBadge(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.12), in: Capsule())
+    private func metadataRow(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 62, alignment: .leading)
+            Text(value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var protocolName: String {

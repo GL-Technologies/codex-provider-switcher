@@ -5,32 +5,27 @@ struct OpenAIDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 header
                 statusCard
                 configurationCard
             }
-            .padding(28)
-            .frame(maxWidth: 900, alignment: .leading)
+            .padding(AppDesign.pagePadding)
+            .frame(maxWidth: AppDesign.pageMaxWidth, alignment: .leading)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppDesign.pageBackground)
     }
 
     private var header: some View {
         HStack(spacing: 16) {
-            ProviderIconView(brand: .openAI, size: 56)
+            ProviderIconView(brand: .openAI, size: 58)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text("OpenAI")
                         .font(.title2.weight(.semibold))
                     if store.isOpenAIActive {
-                        Text(L10n.text("status.active"))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.green.opacity(0.10), in: Capsule())
+                        AppStatusPill(text: L10n.text("status.active"), tone: .success, systemImage: "checkmark")
                     }
                 }
                 Text(L10n.text("official.subtitle"))
@@ -51,49 +46,38 @@ struct OpenAIDetailView: View {
     }
 
     private var statusCard: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.green.opacity(0.12))
-                    .frame(width: 42, height: 42)
-                Image(systemName: "bolt.horizontal.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.green)
-            }
+        AppCard(padding: 15) {
+            HStack(spacing: 14) {
+                AppIconTile(
+                    systemImage: store.isOpenAIActive ? "bolt.horizontal.circle.fill" : "circle.dashed",
+                    tone: store.isOpenAIActive ? .success : .neutral,
+                    size: 42
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.text("menu.direct_active"))
-                    .font(.headline)
-                Text(L10n.text("official.original_config"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(store.isOpenAIActive ? L10n.text("menu.direct_active") : L10n.text("official.original_config"))
+                        .font(.headline)
+                    Text(L10n.text("official.original_config"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-            Spacer()
-        }
-        .padding(14)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
+                Spacer()
+            }
         }
     }
 
     private var configurationCard: some View {
-        VStack(spacing: 0) {
-            infoRow(L10n.text("details.provider"), "OpenAI")
-            Divider().padding(.leading, 170)
-            infoRow(L10n.text("official.configuration"), L10n.text("official.original_config"))
-            Divider().padding(.leading, 170)
-            infoRow(L10n.text("details.auth"), L10n.text("official.chatgpt_account"))
-            Divider().padding(.leading, 170)
-            infoRow(L10n.text("official.history"), L10n.text("official.history_value"))
-        }
-        .padding(.horizontal, 18)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
+        AppCard {
+            VStack(spacing: 0) {
+                infoRow(L10n.text("details.provider"), "OpenAI")
+                Divider().padding(.leading, 170)
+                infoRow(L10n.text("official.configuration"), L10n.text("official.original_config"))
+                Divider().padding(.leading, 170)
+                infoRow(L10n.text("details.auth"), L10n.text("official.chatgpt_account"))
+                Divider().padding(.leading, 170)
+                infoRow(L10n.text("official.history"), L10n.text("official.history_value"))
+            }
         }
     }
 
@@ -101,10 +85,10 @@ struct OpenAIDetailView: View {
         HStack(alignment: .firstTextBaseline, spacing: 24) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 145, alignment: .leading)
+                .frame(width: AppDesign.labelColumnWidth, alignment: .leading)
             Text(value)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 13)
+        .padding(.vertical, 12)
     }
 }

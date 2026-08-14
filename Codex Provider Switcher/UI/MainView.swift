@@ -14,11 +14,11 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 290)
+                .navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)
         } detail: {
             detail
         }
-        .frame(minWidth: 940, minHeight: 610)
+        .frame(minWidth: 980, idealWidth: 1120, minHeight: 650, idealHeight: 720)
         .sheet(isPresented: $isAdding) {
             ProviderEditorView(profile: nil)
                 .environmentObject(store)
@@ -89,14 +89,12 @@ struct MainView: View {
                 )
                 .environmentObject(store)
             } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "network.slash")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text(L10n.text("provider.not_found"))
-                        .foregroundStyle(.secondary)
-                }
+                AppEmptyState(
+                    systemImage: "network.slash",
+                    title: L10n.text("provider.not_found")
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppDesign.pageBackground)
             }
         }
     }
