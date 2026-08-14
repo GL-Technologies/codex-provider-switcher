@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Core tests
+        run: swift test
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project "Codex Provider Switcher.xcodeproj" \
+            -scheme "Codex Provider Switcher" \
+            -configuration Release \
+            -derivedDataPath .build-app/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
