@@ -37,9 +37,17 @@ struct AppNotice: Identifiable {
     let message: String
 }
 
+enum DetectedAPIKind {
+    case responses
+    case chatCompletions
+    case unknown
+}
+
 struct ConnectionTestReport: Identifiable {
     let id = UUID()
     let success: Bool
+    let codexCompatible: Bool
+    let detectedAPI: DetectedAPIKind
     let title: String
     let message: String
     let endpoint: String

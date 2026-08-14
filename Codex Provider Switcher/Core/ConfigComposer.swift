@@ -14,6 +14,7 @@ public enum ConfigComposer {
 
     public static func buildConfig(base: String, profile: ProviderProfile) -> String {
         let cleanBase = stripManagedContent(from: base)
+        let normalizedBaseURL = EndpointBuilder.normalizedBaseURL(from: profile.baseURL)?.absoluteString ?? profile.baseURL
         var lines: [String] = [
             managedMarker,
             activeMarkerPrefix + profile.id.uuidString.lowercased(),
@@ -33,7 +34,7 @@ public enum ConfigComposer {
         lines.append("")
         lines.append("[model_providers.\(providerID)]")
         lines.append("name = \"\(tomlEscape(profile.name.isEmpty ? providerDisplayName : profile.name))\"")
-        lines.append("base_url = \"\(tomlEscape(profile.baseURL))\"")
+        lines.append("base_url = \"\(tomlEscape(normalizedBaseURL))\"")
         if profile.authentication == .bearer {
             lines.append("env_key = \"\(keyEnvironment)\"")
         }

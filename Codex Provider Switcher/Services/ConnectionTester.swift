@@ -1,71 +1,137 @@
 import Foundation
 
 actor ConnectionTester {
+    private struct Attempt {
+        let success: Bool
+        let endpoint: String
+        let statusCode: Int?
+        let durationMilliseconds: Int
+        let data: Data
+        let errorMessage: String?
+    }
+
     func test(profile: ProviderProfile, apiKey: String?) async -> ConnectionTestReport {
-        guard let endpoint = EndpointBuilder.responsesURL(from: profile.baseURL) else {
+        guard EndpointBuilder.normalizedBaseURL(from: profile.baseURL) != nil else {
             return failure(titleKey: "test.invalid", messageKey: "test.invalid_url", endpoint: profile.baseURL)
         }
         let model = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !model.isEmpty else {
-            return failure(titleKey: "test.invalid", messageKey: "test.missing_model", endpoint: endpoint.absoluteString)
+            return failure(titleKey: "test.invalid", messageKey: "test.missing_model", endpoint: profile.baseURL)
         }
         if profile.authentication == .bearer {
             guard let apiKey, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return failure(titleKey: "test.invalid", messageKey: "test.missing_key", endpoint: endpoint.absoluteString)
+                return failure(titleKey: "test.invalid", messageKey: "test.missing_key", endpoint: profile.baseURL)
             }
         }
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 20
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("CodexProviderSwitcher/0.3.2", forHTTPHeaderField: "User-Agent")
-        if profile.authentication == .bearer, let apiKey {
-            request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
+        guard let responsesEndpoint = EndpointBuilder.responsesURL(from: profile.baseURL),
+              let chatEndpoint = EndpointBuilder.chatCompletionsURL(from: profile.baseURL) else {
+            return failure(titleKey: "test.invalid", messageKey: "test.invalid_url", endpoint: profile.baseURL)
         }
 
-        let body: [String: Any] = [
+        let responsesBody: [String: Any] = [
             "model": model,
             "input": "Reply with OK.",
             "max_output_tokens": 32
         ]
+        let responses = await perform(endpoint: responsesEndpoint, body: responsesBody, profile: profile, apiKey: apiKey)
+        if responses.success {
+            return ConnectionTestReport(
+                success: true,
+                codexCompatible: true,
+                detectedAPI: .responses,
+                title: L10n.text("test.responses_ready"),
+                message: outputText(from: responses.data) ?? L10n.text("test.responses_ready_message"),
+                endpoint: responses.endpoint,
+                statusCode: responses.statusCode,
+                durationMilliseconds: responses.durationMilliseconds,
+                responsePreview: preview(responses.data)
+            )
+        }
+
+        let chatBody: [String: Any] = [
+            "model": model,
+            "messages": [["role": "user", "content": "Reply with OK."]],
+            "max_tokens": 32,
+            "stream": false
+        ]
+        let chat = await perform(endpoint: chatEndpoint, body: chatBody, profile: profile, apiKey: apiKey)
+        if chat.success {
+            return ConnectionTestReport(
+                success: true,
+                codexCompatible: false,
+                detectedAPI: .chatCompletions,
+                title: L10n.text("test.chat_only"),
+                message: L10n.text("test.chat_only_message"),
+                endpoint: chat.endpoint,
+                statusCode: chat.statusCode,
+                durationMilliseconds: responses.durationMilliseconds + chat.durationMilliseconds,
+                responsePreview: preview(chat.data)
+            )
+        }
+
+        let responseMessage = diagnosticMessage(for: responses)
+        let chatMessage = diagnosticMessage(for: chat)
+        return ConnectionTestReport(
+            success: false,
+            codexCompatible: false,
+            detectedAPI: .unknown,
+            title: L10n.text("test.failed"),
+            message: L10n.format("test.auto_failed", responseMessage, chatMessage),
+            endpoint: responses.endpoint,
+            statusCode: responses.statusCode,
+            durationMilliseconds: responses.durationMilliseconds + chat.durationMilliseconds,
+            responsePreview: preview(responses.data) ?? preview(chat.data)
+        )
+    }
+
+    private func perform(endpoint: URL, body: [String: Any], profile: ProviderProfile, apiKey: String?) async -> Attempt {
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
-            return failure(titleKey: "test.failed", messageKey: "test.request_error", endpoint: endpoint.absoluteString)
+            return Attempt(success: false, endpoint: endpoint.absoluteString, statusCode: nil, durationMilliseconds: 0, data: Data(), errorMessage: L10n.text("test.request_error"))
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("CodexProviderSwitcher/0.3.4", forHTTPHeaderField: "User-Agent")
+        if profile.authentication == .bearer, let apiKey {
+            request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
         }
         request.httpBody = bodyData
 
         let started = Date()
         do {
             let config = URLSessionConfiguration.ephemeral
-            config.timeoutIntervalForRequest = 20
-            config.timeoutIntervalForResource = 25
+            config.timeoutIntervalForRequest = 15
+            config.timeoutIntervalForResource = 20
             let session = URLSession(configuration: config)
             defer { session.invalidateAndCancel() }
             let (data, response) = try await session.data(for: request)
             let elapsed = Int(Date().timeIntervalSince(started) * 1000)
             guard let http = response as? HTTPURLResponse else {
-                return ConnectionTestReport(success: false, title: L10n.text("test.failed"), message: L10n.text("test.invalid_response"), endpoint: endpoint.absoluteString, statusCode: nil, durationMilliseconds: elapsed, responsePreview: preview(data))
+                return Attempt(success: false, endpoint: endpoint.absoluteString, statusCode: nil, durationMilliseconds: elapsed, data: data, errorMessage: L10n.text("test.invalid_response"))
             }
-
-            let status = http.statusCode
-            if (200...299).contains(status) {
-                return ConnectionTestReport(success: true, title: L10n.text("test.success"), message: outputText(from: data) ?? L10n.text("test.success_message"), endpoint: endpoint.absoluteString, statusCode: status, durationMilliseconds: elapsed, responsePreview: preview(data))
-            }
-
-            return ConnectionTestReport(success: false, title: L10n.text("test.failed"), message: httpMessage(status: status, server: serverMessage(from: data)), endpoint: endpoint.absoluteString, statusCode: status, durationMilliseconds: elapsed, responsePreview: preview(data))
+            return Attempt(success: (200...299).contains(http.statusCode), endpoint: endpoint.absoluteString, statusCode: http.statusCode, durationMilliseconds: elapsed, data: data, errorMessage: nil)
         } catch {
             let elapsed = Int(Date().timeIntervalSince(started) * 1000)
             let ns = error as NSError
             let message = ns.domain == NSURLErrorDomain && ns.code == NSURLErrorTimedOut
                 ? L10n.text("test.timeout")
                 : L10n.format("test.network", error.localizedDescription)
-            return ConnectionTestReport(success: false, title: L10n.text("test.failed"), message: message, endpoint: endpoint.absoluteString, statusCode: nil, durationMilliseconds: elapsed, responsePreview: nil)
+            return Attempt(success: false, endpoint: endpoint.absoluteString, statusCode: nil, durationMilliseconds: elapsed, data: Data(), errorMessage: message)
         }
     }
 
     private func failure(titleKey: String, messageKey: String, endpoint: String) -> ConnectionTestReport {
-        ConnectionTestReport(success: false, title: L10n.text(titleKey), message: L10n.text(messageKey), endpoint: endpoint, statusCode: nil, durationMilliseconds: nil, responsePreview: nil)
+        ConnectionTestReport(success: false, codexCompatible: false, detectedAPI: .unknown, title: L10n.text(titleKey), message: L10n.text(messageKey), endpoint: endpoint, statusCode: nil, durationMilliseconds: nil, responsePreview: nil)
+    }
+
+    private func diagnosticMessage(for attempt: Attempt) -> String {
+        if let errorMessage = attempt.errorMessage { return errorMessage }
+        guard let status = attempt.statusCode else { return L10n.text("test.invalid_response") }
+        return httpMessage(status: status, server: serverMessage(from: attempt.data))
     }
 
     private func httpMessage(status: Int, server: String?) -> String {
@@ -80,7 +146,7 @@ actor ConnectionTester {
         default: base = L10n.format("test.http_other", status)
         }
         guard let server, !server.isEmpty else { return base }
-        return base + "\n" + server
+        return base + " " + server
     }
 
     private func serverMessage(from data: Data) -> String? {

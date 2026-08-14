@@ -1,0 +1,126 @@
+import Foundation
+
+enum AdaptiveStrings {
+    static func value(for key: String) -> String? {
+        let language = Bundle.main.preferredLocalizations.first ?? Locale.current.language.languageCode?.identifier ?? "en"
+        let table = translations[language] ?? translations[String(language.prefix(2))] ?? translations["en"]!
+        return table[key] ?? translations["en"]?[key]
+    }
+
+    private static let translations: [String: [String: String]] = [
+        "en": [
+            "guide.title": "Installation & Security",
+            "guide.subtitle": "If macOS blocks this unsigned build, approve it in System Settings.",
+            "guide.step_open": "Open the app",
+            "guide.step_open_detail": "Try opening Codex Provider Switcher once. If macOS blocks it, continue with the next step.",
+            "guide.step_security": "Approve in Privacy & Security",
+            "guide.step_security_detail": "Open System Settings → Privacy & Security, scroll to Security, then choose Open Anyway for Codex Provider Switcher.",
+            "guide.step_config": "Codex configuration",
+            "guide.step_config_detail": "After the app opens, it only needs normal access to your ~/.codex configuration and macOS Keychain.",
+            "guide.open_security": "Open Privacy & Security",
+            "test.responses_ready": "Ready for Codex",
+            "test.responses_ready_message": "The endpoint accepts OpenAI Responses API requests and can be used directly by current Codex.",
+            "test.chat_only": "API works, but Codex cannot use it directly",
+            "test.chat_only_message": "The API key and model are valid, but this endpoint only accepted Chat Completions. Current Codex requires the Responses API. Use a Responses-compatible gateway/bridge for this provider.",
+            "test.auto_failed": "Responses test: %@\nChat Completions test: %@",
+            "test.detected_protocol": "Detected",
+            "test.codex_direct": "Direct Codex",
+            "test.protocol_unknown": "Unknown"
+        ],
+        "zh-Hans": [
+            "guide.title": "安装与安全",
+            "guide.subtitle": "如果 macOS 阻止未签名版本运行，请在系统设置中手动允许。",
+            "guide.step_open": "先打开应用",
+            "guide.step_open_detail": "先尝试打开 Codex 接口切换器。如果 macOS 提示无法验证或阻止打开，再进行下一步。",
+            "guide.step_security": "在“隐私与安全性”中允许",
+            "guide.step_security_detail": "打开“系统设置 → 隐私与安全性”，滚动到“安全性”，找到 Codex 接口切换器后点击“仍要打开”。",
+            "guide.step_config": "Codex 配置",
+            "guide.step_config_detail": "应用成功打开后，只需要正常读写 ~/.codex 配置，并使用 macOS 钥匙串保存 API Key，不要求完全磁盘访问权限。",
+            "guide.open_security": "打开隐私与安全性",
+            "test.responses_ready": "可直接用于 Codex",
+            "test.responses_ready_message": "该接口支持 OpenAI Responses API，可以被当前 Codex 直接使用。",
+            "test.chat_only": "接口可用，但当前 Codex 不能直接使用",
+            "test.chat_only_message": "API Key 和模型均可正常调用，但该厂商只通过 Chat Completions 接口响应。当前 Codex 只接受 Responses API，需要通过 Responses 兼容网关/桥接层转换。",
+            "test.auto_failed": "Responses 测试：%@\nChat Completions 测试：%@",
+            "test.detected_protocol": "检测协议",
+            "test.codex_direct": "Codex 可直连",
+            "test.protocol_unknown": "未知"
+        ],
+        "zh-Hant": [
+            "guide.title": "安裝與安全性",
+            "guide.subtitle": "若 macOS 阻擋未簽署版本，請在系統設定中手動允許。",
+            "guide.step_open": "先開啟 App",
+            "guide.step_open_detail": "先嘗試開啟 Codex Provider Switcher；若 macOS 阻擋，再進行下一步。",
+            "guide.step_security": "在隱私權與安全性中允許",
+            "guide.step_security_detail": "開啟「系統設定 → 隱私權與安全性」，在安全性區域選擇仍要開啟 Codex Provider Switcher。",
+            "guide.step_config": "Codex 設定",
+            "guide.step_config_detail": "App 開啟後只需正常存取 ~/.codex 與 macOS 鑰匙圈，不需要完整磁碟存取權限。",
+            "guide.open_security": "開啟隱私權與安全性",
+            "test.responses_ready": "可直接用於 Codex",
+            "test.responses_ready_message": "此端點支援 OpenAI Responses API，可由目前 Codex 直接使用。",
+            "test.chat_only": "API 可用，但 Codex 無法直接使用",
+            "test.chat_only_message": "API Key 與模型有效，但端點只接受 Chat Completions。現行 Codex 需要 Responses API，請使用相容的閘道或橋接器。",
+            "test.auto_failed": "Responses 測試：%@\nChat Completions 測試：%@",
+            "test.detected_protocol": "偵測協定",
+            "test.codex_direct": "Codex 可直連",
+            "test.protocol_unknown": "未知"
+        ],
+        "ja": [
+            "guide.title": "インストールとセキュリティ",
+            "guide.subtitle": "macOS が未署名ビルドをブロックした場合は、システム設定で許可してください。",
+            "guide.step_open": "アプリを開く",
+            "guide.step_open_detail": "まず Codex Provider Switcher を開き、macOS にブロックされた場合のみ次の手順へ進みます。",
+            "guide.step_security": "プライバシーとセキュリティで許可",
+            "guide.step_security_detail": "「システム設定 → プライバシーとセキュリティ」のセキュリティ欄で「このまま開く」を選択します。",
+            "guide.step_config": "Codex 設定",
+            "guide.step_config_detail": "起動後は ~/.codex と macOS キーチェーンへの通常アクセスのみ使用します。フルディスクアクセスは不要です。",
+            "guide.open_security": "プライバシーとセキュリティを開く",
+            "test.responses_ready": "Codex で直接使用可能",
+            "test.responses_ready_message": "OpenAI Responses API を受け付けるため、現在の Codex から直接使用できます。",
+            "test.chat_only": "API は動作しますが Codex から直接使用できません",
+            "test.chat_only_message": "API Key とモデルは有効ですが、Chat Completions のみ対応しています。現在の Codex には Responses API 互換ゲートウェイが必要です。",
+            "test.auto_failed": "Responses テスト: %@\nChat Completions テスト: %@",
+            "test.detected_protocol": "検出",
+            "test.codex_direct": "Codex 直結",
+            "test.protocol_unknown": "不明"
+        ],
+        "ko": [
+            "guide.title": "설치 및 보안",
+            "guide.subtitle": "macOS가 서명되지 않은 빌드를 차단하면 시스템 설정에서 허용하세요.",
+            "guide.step_open": "앱 열기",
+            "guide.step_open_detail": "먼저 Codex Provider Switcher를 열고 macOS가 차단하는 경우 다음 단계로 진행하세요.",
+            "guide.step_security": "개인정보 보호 및 보안에서 허용",
+            "guide.step_security_detail": "시스템 설정 → 개인정보 보호 및 보안의 보안 영역에서 Codex Provider Switcher에 대해 ‘그래도 열기’를 선택하세요.",
+            "guide.step_config": "Codex 구성",
+            "guide.step_config_detail": "앱이 실행된 후에는 ~/.codex와 macOS 키체인에 대한 일반 접근만 사용하며 전체 디스크 접근 권한은 필요하지 않습니다.",
+            "guide.open_security": "개인정보 보호 및 보안 열기",
+            "test.responses_ready": "Codex에서 직접 사용 가능",
+            "test.responses_ready_message": "OpenAI Responses API를 지원하므로 현재 Codex에서 직접 사용할 수 있습니다.",
+            "test.chat_only": "API는 동작하지만 Codex에서 직접 사용할 수 없음",
+            "test.chat_only_message": "API Key와 모델은 유효하지만 Chat Completions만 지원합니다. 현재 Codex에는 Responses API 호환 게이트웨이/브리지가 필요합니다.",
+            "test.auto_failed": "Responses 테스트: %@\nChat Completions 테스트: %@",
+            "test.detected_protocol": "감지된 프로토콜",
+            "test.codex_direct": "Codex 직접 연결",
+            "test.protocol_unknown": "알 수 없음"
+        ],
+        "es": [
+            "guide.title": "Instalación y seguridad",
+            "guide.subtitle": "Si macOS bloquea esta compilación sin firmar, autorízala en Ajustes del Sistema.",
+            "guide.step_open": "Abrir la app",
+            "guide.step_open_detail": "Intenta abrir Codex Provider Switcher. Si macOS lo bloquea, continúa con el siguiente paso.",
+            "guide.step_security": "Autorizar en Privacidad y seguridad",
+            "guide.step_security_detail": "Abre Ajustes del Sistema → Privacidad y seguridad y, en Seguridad, elige Abrir de todos modos para Codex Provider Switcher.",
+            "guide.step_config": "Configuración de Codex",
+            "guide.step_config_detail": "Después de abrirse, la app solo usa acceso normal a ~/.codex y al Llavero de macOS; no requiere acceso total al disco.",
+            "guide.open_security": "Abrir Privacidad y seguridad",
+            "test.responses_ready": "Listo para Codex",
+            "test.responses_ready_message": "El endpoint acepta OpenAI Responses API y puede usarse directamente con Codex actual.",
+            "test.chat_only": "La API funciona, pero Codex no puede usarla directamente",
+            "test.chat_only_message": "La API Key y el modelo son válidos, pero el endpoint solo acepta Chat Completions. Codex actual requiere un gateway/bridge compatible con Responses API.",
+            "test.auto_failed": "Prueba Responses: %@\nPrueba Chat Completions: %@",
+            "test.detected_protocol": "Detectado",
+            "test.codex_direct": "Codex directo",
+            "test.protocol_unknown": "Desconocido"
+        ]
+    ]
+}
