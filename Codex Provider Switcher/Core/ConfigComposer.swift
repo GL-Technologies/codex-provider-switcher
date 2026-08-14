@@ -43,6 +43,70 @@ public enum ConfigComposer {
         return lines.joined(separator: "\n")
     }
 
+    /// Builds a configuration that no longer selects a custom model provider.
+    ///
+    /// A historical baseline can itself contain a third-party provider (for example when
+    /// an older release captured the baseline after the user had already customized Codex).
+    /// Restoring that file byte-for-byte would make the UI say OpenAI while Codex still
+    /// routes to the third party. This method removes the active custom-provider selection
+    /// while preserving unrelated user configuration.
+    public static func buildOpenAIConfig(base: String) -> String {
+        let lines = base.components(separatedBy: .newlines)
+        let selectedProvider = topLevelValue(for: "model_provider", in: lines)?.lowercased()
+        let hadCustomProvider = selectedProvider.map { !officialProviderIDs.contains($0) } ?? false
+
+        var output: [String] = []
+        var topLevel = true
+        var skippingManagedProvider = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.hasPrefix("[") {
+                topLevel = false
+                if isManagedProviderHeader(trimmed) {
+                    skippingManagedProvider = true
+                    continue
+                }
+                skippingManagedProvider = false
+            }
+
+            if skippingManagedProvider { continue }
+
+            if trimmed == managedMarker || legacyManagedMarkers.contains(trimmed) || trimmed.hasPrefix(activeMarkerPrefix) {
+                continue
+            }
+
+            if topLevel {
+                if isAssignment(trimmed, key: "model_provider") {
+                    continue
+                }
+                // If the saved baseline explicitly selected a third-party provider, its model
+                // and reasoning settings belong to that route as well. Remove them so Codex can
+                // fall back to the signed-in OpenAI/ChatGPT defaults.
+                if hadCustomProvider && (isAssignment(trimmed, key: "model") || isAssignment(trimmed, key: "model_reasoning_effort")) {
+                    continue
+                }
+            }
+
+            output.append(line)
+        }
+
+        trimBlankEdges(&output)
+        return output.joined(separator: "\n")
+    }
+
+    public static func isOpenAIConfig(_ text: String) -> Bool {
+        if text.contains(managedMarker) || legacyManagedMarkers.contains(where: { text.contains($0) }) {
+            return false
+        }
+        let lines = text.components(separatedBy: .newlines)
+        guard let provider = topLevelValue(for: "model_provider", in: lines)?.lowercased() else {
+            return true
+        }
+        return officialProviderIDs.contains(provider)
+    }
+
     public static func buildEnvironment(base: String, apiKey: String?) -> String {
         let rawLines = base.components(separatedBy: .newlines)
         let prefix = keyEnvironment + "="
@@ -92,26 +156,49 @@ public enum ConfigComposer {
             output.append(line)
         }
 
-        while output.first?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
-            output.removeFirst()
-        }
-        while output.last?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
-            output.removeLast()
-        }
+        trimBlankEdges(&output)
         return output.joined(separator: "\n")
     }
 
+    private static let officialProviderIDs: Set<String> = ["openai", "openai-chatgpt", "chatgpt"]
+
     private static func isTopLevelModelKey(_ line: String) -> Bool {
         let keys = ["model", "model_provider", "model_reasoning_effort"]
-        return keys.contains { key in
-            guard line.hasPrefix(key) else { return false }
-            let rest = line.dropFirst(key.count)
-            return rest.trimmingCharacters(in: .whitespaces).hasPrefix("=")
+        return keys.contains { isAssignment(line, key: $0) }
+    }
+
+    private static func isAssignment(_ line: String, key: String) -> Bool {
+        guard line.hasPrefix(key) else { return false }
+        let rest = line.dropFirst(key.count)
+        return rest.trimmingCharacters(in: .whitespaces).hasPrefix("=")
+    }
+
+    private static func topLevelValue(for key: String, in lines: [String]) -> String? {
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("[") { break }
+            guard isAssignment(trimmed, key: key), let equal = trimmed.firstIndex(of: "=") else { continue }
+            var value = String(trimmed[trimmed.index(after: equal)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.hasPrefix("\"") && value.hasSuffix("\"") && value.count >= 2 {
+                value.removeFirst()
+                value.removeLast()
+            }
+            return value
         }
+        return nil
     }
 
     private static func isManagedProviderHeader(_ line: String) -> Bool {
         line == "[model_providers.\(providerID)]" || line.hasPrefix("[model_providers.\(providerID).")
+    }
+
+    private static func trimBlankEdges(_ lines: inout [String]) {
+        while lines.first?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+            lines.removeFirst()
+        }
+        while lines.last?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+            lines.removeLast()
+        }
     }
 
     private static func tomlEscape(_ value: String) -> String {
