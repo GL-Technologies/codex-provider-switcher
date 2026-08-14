@@ -1,13 +1,11 @@
 import Foundation
 import Network
 
-/// A small localhost-only bridge that lets Codex speak Responses API to providers that
-/// only implement OpenAI Chat Completions.
+/// Localhost-only Responses API bridge for OpenAI-compatible Chat Completions providers.
 ///
-/// The first version is intentionally stateless: Codex sends the conversation/tool-loop
-/// items in each request and the bridge converts those items to Chat Completions messages.
-/// Upstream requests are non-streaming; when Codex asks for streaming, the completed
-/// upstream response is emitted as a valid Responses SSE lifecycle.
+/// Networking and protocol transformation are intentionally separated. `BridgeTransformer`
+/// contains the stateless conversion rules while this class owns the local listener and upstream
+/// HTTP transport. The listener never binds to a public interface.
 final class ChatCompletionsBridge {
     enum BridgeError: LocalizedError {
         case unavailable
@@ -30,7 +28,14 @@ final class ChatCompletionsBridge {
         let apiKey: String?
     }
 
+    private struct HTTPRequest {
+        let method: String
+        let path: String
+        let body: Data
+    }
+
     private let queue = DispatchQueue(label: "CodexProviderSwitcher.ChatBridge")
+    private let maximumRequestBytes = 64 * 1024 * 1024
     private var listener: NWListener?
     private var configuration: UpstreamConfiguration?
     private(set) var port: UInt16 = 24864
@@ -45,14 +50,15 @@ final class ChatCompletionsBridge {
         var lastError: Error?
         for candidate in 24864...24874 {
             do {
-                let resolvedPort = try await startListener(port: UInt16(candidate))
-                port = resolvedPort
+                port = try await startListener(port: UInt16(candidate))
                 return baseURL
             } catch {
                 lastError = error
-                stop()
+                listener?.cancel()
+                listener = nil
             }
         }
+        configuration = nil
         throw lastError ?? BridgeError.unavailable
     }
 
@@ -85,9 +91,7 @@ final class ChatCompletionsBridge {
                     break
                 }
             }
-            listener.newConnectionHandler = { [weak self] connection in
-                self?.accept(connection)
-            }
+            listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
             listener.start(queue: queue)
         }
     }
@@ -103,23 +107,22 @@ final class ChatCompletionsBridge {
             var next = buffer
             if let data { next.append(data) }
 
-            if let request = self.parseHTTPRequest(next) {
-                self.handle(request, connection: connection)
+            if next.count > maximumRequestBytes {
+                sendJSON(connection, status: 413, object: ["error": ["message": "Local bridge request is too large"]])
                 return
             }
 
-            if error != nil || isComplete || next.count > 4_194_304 {
-                self.sendJSON(connection, status: 400, object: ["error": ["message": "Invalid local bridge request"]])
+            if let request = parseHTTPRequest(next) {
+                handle(request, connection: connection)
                 return
             }
-            self.receive(connection, buffer: next)
+
+            if error != nil || isComplete {
+                sendJSON(connection, status: 400, object: ["error": ["message": "Invalid local bridge request"]])
+                return
+            }
+            receive(connection, buffer: next)
         }
-    }
-
-    private struct HTTPRequest {
-        let method: String
-        let path: String
-        let body: Data
     }
 
     private func parseHTTPRequest(_ data: Data) -> HTTPRequest? {
@@ -143,6 +146,7 @@ final class ChatCompletionsBridge {
             }
         }
 
+        guard length >= 0, length <= maximumRequestBytes else { return nil }
         let bodyStart = headerRange.upperBound
         guard data.count >= bodyStart + length else { return nil }
         let body = length > 0 ? data.subdata(in: bodyStart..<(bodyStart + length)) : Data()
@@ -150,7 +154,16 @@ final class ChatCompletionsBridge {
     }
 
     private func handle(_ request: HTTPRequest, connection: NWConnection) {
-        if request.method == "GET" && (request.path == "/models" || request.path == "/v1/models") {
+        if request.method == "GET", request.path == "/health" || request.path == "/v1/health" {
+            sendJSON(connection, status: configuration == nil ? 503 : 200, object: [
+                "status": configuration == nil ? "not_configured" : "ok",
+                "bridge": "codex-provider-switcher",
+                "port": Int(port)
+            ])
+            return
+        }
+
+        if request.method == "GET", request.path == "/models" || request.path == "/v1/models" {
             guard let profile = configuration?.profile else {
                 sendJSON(connection, status: 503, object: ["error": ["message": "Bridge is not configured"]])
                 return
@@ -173,144 +186,25 @@ final class ChatCompletionsBridge {
 
         Task {
             do {
-                let input = try JSONSerialization.jsonObject(with: request.body) as? [String: Any] ?? [:]
-                let wantsStream = input["stream"] as? Bool ?? false
-                let upstreamBody = try makeChatRequest(from: input, profile: configuration.profile)
-                let upstream = try await callUpstream(body: upstreamBody, configuration: configuration)
-                let response = try makeResponsesObject(from: upstream, model: configuration.profile.model)
-                if wantsStream {
-                    sendSSE(connection, response: response)
-                } else {
-                    sendJSON(connection, status: 200, object: response)
+                guard let input = try JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
+                    throw BridgeError.invalidRequest("Responses request must be a JSON object")
                 }
+                let wantsStream = input["stream"] as? Bool ?? false
+                let conversion = BridgeTransformer.makeChatRequest(from: input, profile: configuration.profile)
+                let upstream = try await callUpstream(body: conversion.body, configuration: configuration)
+                let response = try BridgeTransformer.makeResponsesObject(
+                    from: upstream,
+                    model: configuration.profile.model,
+                    toolContext: conversion.toolContext
+                )
+                if wantsStream { sendSSE(connection, response: response) }
+                else { sendJSON(connection, status: 200, object: response) }
             } catch {
                 sendJSON(connection, status: 502, object: [
-                    "error": [
-                        "message": error.localizedDescription,
-                        "type": "bridge_error"
-                    ]
+                    "error": ["message": error.localizedDescription, "type": "bridge_error"]
                 ])
             }
         }
-    }
-
-    private func makeChatRequest(from responseRequest: [String: Any], profile: ProviderProfile) throws -> [String: Any] {
-        var messages: [[String: Any]] = []
-        if let instructions = responseRequest["instructions"] as? String, !instructions.isEmpty {
-            messages.append(["role": "system", "content": instructions])
-        }
-
-        if let input = responseRequest["input"] as? String {
-            messages.append(["role": "user", "content": input])
-        } else if let items = responseRequest["input"] as? [[String: Any]] {
-            appendInputItems(items, to: &messages)
-        }
-
-        if messages.isEmpty {
-            messages.append(["role": "user", "content": ""])
-        }
-
-        var body: [String: Any] = [
-            "model": profile.model,
-            "messages": messages,
-            "stream": false
-        ]
-        if let max = responseRequest["max_output_tokens"] as? Int { body["max_tokens"] = max }
-        if let temperature = responseRequest["temperature"] { body["temperature"] = temperature }
-        if let topP = responseRequest["top_p"] { body["top_p"] = topP }
-
-        if let tools = responseRequest["tools"] as? [[String: Any]] {
-            let converted = tools.compactMap(convertTool)
-            if !converted.isEmpty { body["tools"] = converted }
-        }
-        if let toolChoice = convertToolChoice(responseRequest["tool_choice"]) {
-            body["tool_choice"] = toolChoice
-        }
-        if let parallel = responseRequest["parallel_tool_calls"] as? Bool {
-            body["parallel_tool_calls"] = parallel
-        }
-        return body
-    }
-
-    private func appendInputItems(_ items: [[String: Any]], to messages: inout [[String: Any]]) {
-        var pendingAssistantToolCalls: [[String: Any]] = []
-
-        func flushToolCalls() {
-            guard !pendingAssistantToolCalls.isEmpty else { return }
-            messages.append(["role": "assistant", "content": NSNull(), "tool_calls": pendingAssistantToolCalls])
-            pendingAssistantToolCalls.removeAll()
-        }
-
-        for item in items {
-            let type = item["type"] as? String ?? "message"
-            switch type {
-            case "message":
-                flushToolCalls()
-                let role = item["role"] as? String ?? "user"
-                let content = textContent(item["content"])
-                messages.append(["role": role == "developer" ? "system" : role, "content": content])
-
-            case "function_call":
-                let callID = (item["call_id"] as? String) ?? (item["id"] as? String) ?? "call_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
-                let name = item["name"] as? String ?? "tool"
-                let arguments = item["arguments"] as? String ?? "{}"
-                pendingAssistantToolCalls.append([
-                    "id": callID,
-                    "type": "function",
-                    "function": ["name": name, "arguments": arguments]
-                ])
-
-            case "function_call_output":
-                flushToolCalls()
-                let callID = (item["call_id"] as? String) ?? ""
-                let output = textContent(item["output"])
-                messages.append(["role": "tool", "tool_call_id": callID, "content": output])
-
-            default:
-                if let role = item["role"] as? String {
-                    flushToolCalls()
-                    messages.append(["role": role, "content": textContent(item["content"])])
-                }
-            }
-        }
-        flushToolCalls()
-    }
-
-    private func textContent(_ value: Any?) -> String {
-        if let string = value as? String { return string }
-        if value is NSNull || value == nil { return "" }
-        if let parts = value as? [[String: Any]] {
-            return parts.compactMap { part in
-                if let text = part["text"] as? String { return text }
-                if let text = part["output_text"] as? String { return text }
-                if let text = part["input_text"] as? String { return text }
-                return nil
-            }.joined(separator: "\n")
-        }
-        if let data = try? JSONSerialization.data(withJSONObject: value as Any),
-           let string = String(data: data, encoding: .utf8) { return string }
-        return String(describing: value ?? "")
-    }
-
-    private func convertTool(_ tool: [String: Any]) -> [String: Any]? {
-        guard (tool["type"] as? String) == "function" else { return nil }
-        if let function = tool["function"] as? [String: Any] {
-            return ["type": "function", "function": function]
-        }
-        guard let name = tool["name"] as? String else { return nil }
-        var function: [String: Any] = ["name": name]
-        if let description = tool["description"] { function["description"] = description }
-        function["parameters"] = tool["parameters"] ?? ["type": "object", "properties": [:]]
-        return ["type": "function", "function": function]
-    }
-
-    private func convertToolChoice(_ value: Any?) -> Any? {
-        if let text = value as? String { return text }
-        guard let object = value as? [String: Any] else { return nil }
-        if (object["type"] as? String) == "function", let name = object["name"] as? String {
-            return ["type": "function", "function": ["name": name]]
-        }
-        return nil
     }
 
     private func callUpstream(body: [String: Any], configuration: UpstreamConfiguration) async throws -> [String: Any] {
@@ -319,25 +213,25 @@ final class ChatCompletionsBridge {
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 120
+        request.timeoutInterval = 180
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("CodexProviderSwitcher-Bridge/0.3.6", forHTTPHeaderField: "User-Agent")
+        request.setValue("CodexProviderSwitcher-Bridge/0.3.7", forHTTPHeaderField: "User-Agent")
         if configuration.profile.authentication == .bearer, let apiKey = configuration.apiKey {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.timeoutIntervalForRequest = 120
-        sessionConfig.timeoutIntervalForResource = 180
+        sessionConfig.timeoutIntervalForRequest = 180
+        sessionConfig.timeoutIntervalForResource = 300
         let session = URLSession(configuration: sessionConfig)
         defer { session.invalidateAndCancel() }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw BridgeError.upstream("Invalid upstream response") }
         guard (200...299).contains(http.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? ""
-            throw BridgeError.upstream("Upstream HTTP \(http.statusCode): \(detail.prefix(800))")
+            throw BridgeError.upstream("Upstream HTTP \(http.statusCode): \(detail.prefix(1200))")
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw BridgeError.upstream("Upstream returned invalid JSON")
@@ -345,137 +239,92 @@ final class ChatCompletionsBridge {
         return object
     }
 
-    private func makeResponsesObject(from chat: [String: Any], model: String) throws -> [String: Any] {
-        guard let choices = chat["choices"] as? [[String: Any]],
-              let choice = choices.first,
-              let message = choice["message"] as? [String: Any] else {
-            throw BridgeError.upstream("Chat Completions response did not contain choices[0].message")
-        }
+    // MARK: - Responses SSE
 
-        let responseID = "resp_bridge_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
-        var output: [[String: Any]] = []
+    private func sendSSE(_ connection: NWConnection, response: [String: Any]) {
+        var events: [[String: Any]] = []
+        var created = response
+        created["output"] = []
+        created["status"] = "in_progress"
+        events.append(["type": "response.created", "response": created])
 
-        if let content = message["content"] as? String, !content.isEmpty {
-            output.append([
-                "id": "msg_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
-                "type": "message",
-                "status": "completed",
-                "role": "assistant",
-                "content": [["type": "output_text", "text": content, "annotations": []]]
-            ])
-        }
+        if let output = response["output"] as? [[String: Any]] {
+            for (index, item) in output.enumerated() {
+                var added = item
+                added["status"] = "in_progress"
+                events.append(["type": "response.output_item.added", "output_index": index, "item": added])
 
-        if let toolCalls = message["tool_calls"] as? [[String: Any]] {
-            for toolCall in toolCalls {
-                guard let function = toolCall["function"] as? [String: Any],
-                      let name = function["name"] as? String else { continue }
-                output.append([
-                    "id": "fc_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
-                    "type": "function_call",
-                    "status": "completed",
-                    "call_id": (toolCall["id"] as? String) ?? "call_\(UUID().uuidString)",
-                    "name": name,
-                    "arguments": (function["arguments"] as? String) ?? "{}"
-                ])
+                switch item["type"] as? String {
+                case "message":
+                    if let content = item["content"] as? [[String: Any]] {
+                        for (contentIndex, part) in content.enumerated() {
+                            if (part["type"] as? String) == "output_text", let text = part["text"] as? String {
+                                events.append(["type": "response.content_part.added", "item_id": item["id"] ?? "", "output_index": index, "content_index": contentIndex, "part": ["type": "output_text", "text": "", "annotations": []]])
+                                if !text.isEmpty {
+                                    events.append(["type": "response.output_text.delta", "item_id": item["id"] ?? "", "output_index": index, "content_index": contentIndex, "delta": text])
+                                }
+                                events.append(["type": "response.output_text.done", "item_id": item["id"] ?? "", "output_index": index, "content_index": contentIndex, "text": text])
+                                events.append(["type": "response.content_part.done", "item_id": item["id"] ?? "", "output_index": index, "content_index": contentIndex, "part": part])
+                            }
+                        }
+                    }
+                case "function_call":
+                    let args = item["arguments"] as? String ?? "{}"
+                    if !args.isEmpty {
+                        events.append(["type": "response.function_call_arguments.delta", "item_id": item["id"] ?? "", "output_index": index, "delta": args])
+                    }
+                    events.append(["type": "response.function_call_arguments.done", "item_id": item["id"] ?? "", "output_index": index, "arguments": args])
+                case "custom_tool_call":
+                    let input = item["input"] as? String ?? ""
+                    if !input.isEmpty {
+                        events.append(["type": "response.custom_tool_call_input.delta", "item_id": item["id"] ?? "", "output_index": index, "delta": input])
+                    }
+                    events.append(["type": "response.custom_tool_call_input.done", "item_id": item["id"] ?? "", "output_index": index, "input": input])
+                default:
+                    break
+                }
+
+                events.append(["type": "response.output_item.done", "output_index": index, "item": item])
             }
         }
+        events.append(["type": "response.completed", "response": response])
 
-        let usage = chat["usage"] as? [String: Any] ?? [:]
-        let inputTokens = usage["prompt_tokens"] as? Int ?? 0
-        let outputTokens = usage["completion_tokens"] as? Int ?? 0
-        let totalTokens = usage["total_tokens"] as? Int ?? inputTokens + outputTokens
+        let payload = events.compactMap { event -> String? in
+            guard let data = try? JSONSerialization.data(withJSONObject: event), let json = String(data: data, encoding: .utf8) else { return nil }
+            return "event: \(event["type"] as? String ?? "message")\ndata: \(json)\n\n"
+        }.joined() + "data: [DONE]\n\n"
 
-        return [
-            "id": responseID,
-            "object": "response",
-            "created_at": Int(Date().timeIntervalSince1970),
-            "status": "completed",
-            "model": model,
-            "output": output,
-            "parallel_tool_calls": true,
-            "error": NSNull(),
-            "incomplete_details": NSNull(),
-            "usage": [
-                "input_tokens": inputTokens,
-                "input_tokens_details": ["cached_tokens": 0],
-                "output_tokens": outputTokens,
-                "output_tokens_details": ["reasoning_tokens": 0],
-                "total_tokens": totalTokens
-            ]
-        ]
+        sendRaw(connection, status: 200, contentType: "text/event-stream; charset=utf-8", body: Data(payload.utf8), extraHeaders: [
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        ])
     }
+
+    // MARK: - HTTP response helpers
 
     private func sendJSON(_ connection: NWConnection, status: Int, object: [String: Any]) {
         let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
-        let reason = status == 200 ? "OK" : (status == 404 ? "Not Found" : "Error")
-        let header = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: application/json\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
+        sendRaw(connection, status: status, contentType: "application/json; charset=utf-8", body: data)
+    }
+
+    private func sendRaw(_ connection: NWConnection, status: Int, contentType: String, body: Data, extraHeaders: [String: String] = [:]) {
+        let reason: String
+        switch status {
+        case 200: reason = "OK"
+        case 400: reason = "Bad Request"
+        case 404: reason = "Not Found"
+        case 413: reason = "Payload Too Large"
+        case 502: reason = "Bad Gateway"
+        case 503: reason = "Service Unavailable"
+        default: reason = "Error"
+        }
+
+        var header = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: \(contentType)\r\nContent-Length: \(body.count)\r\nConnection: close\r\n"
+        for (key, value) in extraHeaders { header += "\(key): \(value)\r\n" }
+        header += "\r\n"
+
         var packet = Data(header.utf8)
-        packet.append(data)
+        packet.append(body)
         connection.send(content: packet, completion: .contentProcessed { _ in connection.cancel() })
-    }
-
-    private func sendSSE(_ connection: NWConnection, response: [String: Any]) {
-        let header = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
-        connection.send(content: Data(header.utf8), completion: .contentProcessed { [weak self] error in
-            guard error == nil, let self else { connection.cancel(); return }
-            var sequence = 0
-            var events: [[String: Any]] = []
-
-            func event(_ type: String, _ fields: [String: Any] = [:]) {
-                sequence += 1
-                var object = fields
-                object["type"] = type
-                object["sequence_number"] = sequence
-                events.append(object)
-            }
-
-            var created = response
-            created["status"] = "in_progress"
-            created["output"] = []
-            event("response.created", ["response": created])
-
-            if let outputs = response["output"] as? [[String: Any]] {
-                for (index, item) in outputs.enumerated() {
-                    event("response.output_item.added", ["output_index": index, "item": item])
-                    if (item["type"] as? String) == "message",
-                       let content = item["content"] as? [[String: Any]],
-                       let part = content.first,
-                       let text = part["text"] as? String,
-                       let itemID = item["id"] as? String {
-                        event("response.content_part.added", ["item_id": itemID, "output_index": index, "content_index": 0, "part": ["type": "output_text", "text": "", "annotations": []]])
-                        event("response.output_text.delta", ["item_id": itemID, "output_index": index, "content_index": 0, "delta": text, "logprobs": []])
-                        event("response.output_text.done", ["item_id": itemID, "output_index": index, "content_index": 0, "text": text, "logprobs": []])
-                        event("response.content_part.done", ["item_id": itemID, "output_index": index, "content_index": 0, "part": part])
-                    } else if (item["type"] as? String) == "function_call",
-                              let itemID = item["id"] as? String,
-                              let name = item["name"] as? String,
-                              let arguments = item["arguments"] as? String {
-                        event("response.function_call_arguments.delta", ["item_id": itemID, "output_index": index, "delta": arguments])
-                        event("response.function_call_arguments.done", ["item_id": itemID, "output_index": index, "name": name, "arguments": arguments])
-                    }
-                    event("response.output_item.done", ["output_index": index, "item": item])
-                }
-            }
-            event("response.completed", ["response": response])
-
-            self.sendSSEEvents(events, at: 0, connection: connection)
-        })
-    }
-
-    private func sendSSEEvents(_ events: [[String: Any]], at index: Int, connection: NWConnection) {
-        guard index < events.count else {
-            connection.send(content: Data("data: [DONE]\n\n".utf8), completion: .contentProcessed { _ in connection.cancel() })
-            return
-        }
-        let event = events[index]
-        guard let data = try? JSONSerialization.data(withJSONObject: event),
-              let json = String(data: data, encoding: .utf8) else {
-            sendSSEEvents(events, at: index + 1, connection: connection)
-            return
-        }
-        connection.send(content: Data("data: \(json)\n\n".utf8), completion: .contentProcessed { [weak self] error in
-            guard error == nil else { connection.cancel(); return }
-            self?.sendSSEEvents(events, at: index + 1, connection: connection)
-        })
     }
 }
