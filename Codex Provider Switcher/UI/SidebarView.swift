@@ -32,31 +32,16 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .foregroundStyle(store.autoBridgeEnabled ? .green : .secondary)
-                    Text(L10n.text("bridge.auto"))
-                        .font(.caption.weight(.medium))
-                    Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { store.autoBridgeEnabled },
-                        set: { store.setAutoBridgeEnabled($0) }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .disabled(store.isBusy)
-                }
-                .help(L10n.text("bridge.auto_help"))
-
-                Divider()
+            VStack(spacing: 10) {
+                bridgeControl
 
                 HStack(spacing: 8) {
                     Button {
                         NotificationCenter.default.post(name: .addProviderRequested, object: nil)
                     } label: {
-                        Image(systemName: "plus")
+                        Label(L10n.text("action.add_provider"), systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                            .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.borderless)
                     .help(L10n.text("action.add_provider"))
@@ -67,15 +52,59 @@ struct SidebarView: View {
                         store.showAccessSetup()
                     } label: {
                         Image(systemName: "questionmark.circle")
+                            .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.borderless)
                     .help(L10n.text("guide.title"))
                 }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 9)
             .background(.bar)
         }
+    }
+
+    private var bridgeControl: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(store.autoBridgeEnabled ? Color.green.opacity(0.14) : Color.secondary.opacity(0.10))
+                    .frame(width: 32, height: 32)
+                Image(systemName: "point.3.connected.trianglepath.dotted")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(store.autoBridgeEnabled ? .green : .secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L10n.text("bridge.auto"))
+                    .font(.caption.weight(.semibold))
+                Text(store.autoBridgeEnabled ? L10n.text("bridge.active") : L10n.text("bridge.inactive"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Toggle("", isOn: Binding(
+                get: { store.autoBridgeEnabled },
+                set: { store.setAutoBridgeEnabled($0) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .disabled(store.isBusy)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+        }
+        .help(L10n.text("bridge.auto_help"))
     }
 
     private func providerRow(title: String, subtitle: String, brand: ProviderBrand, active: Bool, warning: Bool) -> some View {
@@ -84,7 +113,7 @@ struct SidebarView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body.weight(.medium))
+                    .font(.body.weight(active ? .semibold : .medium))
                     .lineLimit(1)
                 Text(subtitle)
                     .font(.caption)
@@ -100,12 +129,13 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .help(L10n.text("key.missing"))
             } else if active {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 8, height: 8)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
                     .help(L10n.text("status.active"))
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
     }
 }
