@@ -10,7 +10,7 @@ final class AppStore: ObservableObject {
     @Published var shouldOfferRestart = false
     @Published var isBusy = false
 
-    let preferences = AppPreferences()
+    var preferences = AppPreferences()
     let configManager = ConfigManager()
     let keychain = KeychainStore()
     let tester = ConnectionTester()
