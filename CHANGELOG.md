@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.4
+
+- Replaced the macOS permission gate with an installation/security guide for approving unsigned builds through System Settings → Privacy & Security → Open Anyway.
+- Removed Full Disk Access from the normal setup flow and Settings UI.
+- Added adaptive endpoint normalization for Base URLs that already include `/responses` or `/chat/completions`.
+- Added automatic two-stage connection testing: Responses API first, then Chat Completions for diagnosis.
+- Distinguishes providers that are directly compatible with current Codex from providers whose API works but requires a Responses-compatible bridge.
+- Added built-in endpoint presets for common providers, including DeepSeek and Zhipu AI.
+- Prevents switching after a test proves that the configured endpoint is Chat-Completions-only.
+- Added localized protocol-detection and installation-guide text for all supported UI languages.
+
 ## 0.3.3
 
 - Redesigned the macOS interface with aligned configuration grids, compact actions, detail cards, and native adaptive light/dark colors.
