@@ -2,6 +2,9 @@ import SwiftUI
 
 extension Notification.Name {
     static let addProviderRequested = Notification.Name("CodexProviderSwitcher.addProvider")
+    static let editSelectedProviderRequested = Notification.Name("CodexProviderSwitcher.editSelectedProvider")
+    static let duplicateSelectedProviderRequested = Notification.Name("CodexProviderSwitcher.duplicateSelectedProvider")
+    static let deleteSelectedProviderRequested = Notification.Name("CodexProviderSwitcher.deleteSelectedProvider")
 }
 
 struct MainView: View {
@@ -13,12 +16,27 @@ struct MainView: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)
+            SidebarView(
+                selection: $selection,
+                onEdit: edit,
+                onDuplicate: duplicate,
+                onDelete: requestDelete
+            )
+            .navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)
         } detail: {
             detail
         }
         .frame(minWidth: 980, idealWidth: 1120, minHeight: 650, idealHeight: 720)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isAdding = true
+                } label: {
+                    Label(L10n.text("action.add_provider"), systemImage: "plus")
+                }
+                .help(L10n.text("action.add_provider"))
+            }
+        }
         .sheet(isPresented: $isAdding) {
             ProviderEditorView(profile: nil)
                 .environmentObject(store)
@@ -56,7 +74,9 @@ struct MainView: View {
         ) { profile in
             Button(L10n.text("action.delete"), role: .destructive) {
                 store.delete(profile)
-                selection = .openAI
+                if selection == .provider(profile.id) {
+                    selection = .openAI
+                }
                 deleteTarget = nil
             }
             Button(L10n.text("action.cancel"), role: .cancel) { deleteTarget = nil }
@@ -66,6 +86,15 @@ struct MainView: View {
         .onAppear { syncSelectionToActiveProfile() }
         .onReceive(NotificationCenter.default.publisher(for: .addProviderRequested)) { _ in
             isAdding = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .editSelectedProviderRequested)) { _ in
+            if let profile = selectedProfile { edit(profile) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .duplicateSelectedProviderRequested)) { _ in
+            if let profile = selectedProfile { duplicate(profile) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .deleteSelectedProviderRequested)) { _ in
+            if let profile = selectedProfile { requestDelete(profile) }
         }
     }
 
@@ -78,14 +107,7 @@ struct MainView: View {
             if let profile = store.profile(id: id) {
                 ProviderDetailView(
                     profile: profile,
-                    onEdit: { editingProfile = profile },
-                    onDuplicate: {
-                        if let copy = store.duplicate(profile) {
-                            selection = .provider(copy.id)
-                            editingProfile = copy
-                        }
-                    },
-                    onDelete: { deleteTarget = profile }
+                    onEdit: { edit(profile) }
                 )
                 .environmentObject(store)
             } else {
@@ -97,6 +119,26 @@ struct MainView: View {
                 .background(AppDesign.pageBackground)
             }
         }
+    }
+
+    private var selectedProfile: ProviderProfile? {
+        guard case .provider(let id) = selection else { return nil }
+        return store.profile(id: id)
+    }
+
+    private func edit(_ profile: ProviderProfile) {
+        selection = .provider(profile.id)
+        editingProfile = profile
+    }
+
+    private func duplicate(_ profile: ProviderProfile) {
+        guard let copy = store.duplicate(profile) else { return }
+        selection = .provider(copy.id)
+    }
+
+    private func requestDelete(_ profile: ProviderProfile) {
+        selection = .provider(profile.id)
+        deleteTarget = profile
     }
 
     private func syncSelectionToActiveProfile() {
