@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.7
+
+- Added **Auto Bridge** as a first-class, default-on switch in the main sidebar, Settings, and menu bar.
+- Chat-Completions-only providers now test as ready when Auto Bridge is enabled instead of showing a blocking compatibility warning.
+- Fixed provider creation appearing to do nothing: provider names can be generated automatically, Save has local validation, and save failures are shown inside the editor sheet.
+- Added a persistent macOS menu bar item with active-route status, quick provider switching, Auto Bridge control, Settings, and Quit.
+- A bridged provider is restored automatically after relaunch when Codex is still configured for the local bridge.
+- Reworked bridge transformation into a testable core and expanded compatibility for Codex function tools, custom/freeform tools, tool search, namespaces, reasoning text, strict system-message ordering, tool schemas, and token usage.
+- Increased local bridge request capacity to 64 MiB and added a local health endpoint.
+- Added bridge transformation unit tests for custom tools, namespace tools, and strict message normalization.
+- Added third-party acknowledgements for CC Switch, whose MIT-licensed routing architecture informed the compatibility review.
+
 ## 0.3.6
 
 - Added a localhost Responses-to-Chat-Completions bridge so Chat-Completions-only providers can be used by current Codex.
