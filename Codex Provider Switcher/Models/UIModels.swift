@@ -51,7 +51,17 @@ struct ConnectionTestReport: Identifiable {
     let title: String
     let message: String
     let endpoint: String
+    let resolvedBaseURL: String?
     let statusCode: Int?
     let durationMilliseconds: Int?
     let responsePreview: String?
+}
+
+struct ModelDiscoveryReport {
+    let models: [String]
+    let resolvedBaseURL: String?
+    let endpoint: String?
+    let message: String
+
+    var success: Bool { !models.isEmpty }
 }
