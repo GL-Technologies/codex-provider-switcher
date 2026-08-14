@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.6
+
+- Added a localhost Responses-to-Chat-Completions bridge so Chat-Completions-only providers can be used by current Codex.
+- Provider activation now auto-detects protocol support: Responses-compatible providers connect directly; Chat-Completions-only providers are routed through the bridge automatically.
+- The bridge translates text conversations, standard function tools, function-call outputs, and Responses SSE lifecycle events.
+- Added bridge status/badges to the provider UI and localized bridge messaging in all supported languages.
+- Replaced automatic macOS Keychain reads in GitHub/ad-hoc builds with a local owner-only credential file (`~/.codex/provider-switcher/credentials.json`, mode 0600) to avoid recurring login-keychain approval prompts after app rebuilds/updates.
+- Existing Keychain values are not read automatically; affected users paste each provider key once after upgrading.
+
 ## 0.3.5
 
 - Added conservative Base URL auto-discovery: the exact URL is tried first, then `/v1` only when the user entered a host/root URL.
