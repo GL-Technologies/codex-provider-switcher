@@ -21,8 +21,9 @@ struct ProviderDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 18) {
                 header
+                statusCard
 
                 Picker("", selection: $section) {
                     Text(L10n.text("details.configuration")).tag(0)
@@ -30,7 +31,7 @@ struct ProviderDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 310)
+                .frame(width: 330)
 
                 if section == 0 {
                     configurationCard
@@ -38,39 +39,29 @@ struct ProviderDetailView: View {
                     testCard
                 }
             }
-            .padding(26)
-            .frame(maxWidth: 880, alignment: .leading)
+            .padding(28)
+            .frame(maxWidth: 900, alignment: .leading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            ProviderIconView(brand: profile.resolvedBrand, size: 52)
+        HStack(spacing: 16) {
+            ProviderIconView(brand: profile.resolvedBrand, size: 56)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(profile.name)
                         .font(.title2.weight(.semibold))
                     if isActive {
-                        Text(L10n.text("status.active"))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.green.opacity(0.10), in: Capsule())
+                        statusBadge(L10n.text("status.active"), color: .green)
                     }
                     if isBridged {
-                        Text(L10n.text("bridge.badge"))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.orange.opacity(0.12), in: Capsule())
+                        statusBadge(L10n.text("bridge.badge"), color: .orange)
                     }
                 }
                 Text(profile.model)
-                    .font(.callout)
+                    .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
             }
 
@@ -80,7 +71,14 @@ struct ProviderDetailView: View {
                 runTest()
                 section = 1
             } label: {
-                Label(L10n.text("action.test"), systemImage: "waveform.path.ecg")
+                if isTesting {
+                    HStack(spacing: 7) {
+                        ProgressView().controlSize(.small)
+                        Text(L10n.text("test.testing"))
+                    }
+                } else {
+                    Label(L10n.text("action.test"), systemImage: "waveform.path.ecg")
+                }
             }
             .disabled(isTesting)
 
@@ -99,9 +97,55 @@ struct ProviderDetailView: View {
                 Button(L10n.text("action.delete"), role: .destructive, action: onDelete)
             } label: {
                 Image(systemName: "ellipsis")
+                    .frame(width: 20, height: 20)
             }
             .menuStyle(.borderlessButton)
-            .frame(width: 28)
+            .frame(width: 30)
+        }
+    }
+
+    private var statusCard: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isBridged ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
+                    .frame(width: 42, height: 42)
+                Image(systemName: isBridged ? "point.3.connected.trianglepath.dotted" : "bolt.horizontal.circle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(isBridged ? .orange : .green)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(isBridged ? L10n.text("bridge.active") : L10n.text("bridge.inactive"))
+                    .font(.headline)
+                Text(isBridged ? L10n.text("bridge.keep_running") : profile.baseURL)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(L10n.text("bridge.auto"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Toggle("", isOn: Binding(
+                    get: { store.autoBridgeEnabled },
+                    set: { store.setAutoBridgeEnabled($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(store.isBusy)
+            }
+        }
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
         }
     }
 
@@ -144,7 +188,10 @@ struct ProviderDetailView: View {
                         runTest()
                     } label: {
                         if isTesting {
-                            ProgressView().controlSize(.small)
+                            HStack(spacing: 7) {
+                                ProgressView().controlSize(.small)
+                                Text(L10n.text("test.testing"))
+                            }
                         } else {
                             Text(testResult == nil ? L10n.text("action.test") : L10n.text("action.test_again"))
                         }
@@ -154,17 +201,29 @@ struct ProviderDetailView: View {
 
                 if let testResult {
                     ConnectionResultView(report: testResult)
+                        .environmentObject(store)
                 } else {
                     HStack(spacing: 10) {
                         Image(systemName: "waveform.path.ecg")
+                            .font(.title3)
                             .foregroundStyle(.secondary)
                         Text(L10n.text("test.not_run"))
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 22)
                 }
             }
         }
+    }
+
+    private func statusBadge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.10), in: Capsule())
     }
 
     @ViewBuilder
@@ -175,7 +234,7 @@ struct ProviderDetailView: View {
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
             }
     }
 
