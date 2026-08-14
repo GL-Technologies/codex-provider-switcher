@@ -9,7 +9,11 @@ struct ProviderEditorView: View {
     @State private var apiKey = ""
     @State private var showKey = true
     @State private var isTesting = false
+    @State private var isDiscoveringModels = false
+    @State private var discoveredModels: [String] = []
+    @State private var modelDiscoveryMessage: String?
     @State private var testResult: ConnectionTestReport?
+    @State private var applyingDetection = false
 
     init(profile: ProviderProfile?) {
         original = profile
@@ -46,16 +50,60 @@ struct ProviderEditorView: View {
                             }
 
                             fieldRow(L10n.text("field.base_url")) {
-                                TextField(L10n.text("placeholder.base_url"), text: $draft.baseURL)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.body.monospaced())
+                                HStack(spacing: 8) {
+                                    TextField(L10n.text("placeholder.base_url"), text: $draft.baseURL)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.body.monospaced())
+
+                                    Button {
+                                        discoverModels()
+                                    } label: {
+                                        if isDiscoveringModels {
+                                            ProgressView().controlSize(.small)
+                                        } else {
+                                            Label(L10n.text("models.discover"), systemImage: "magnifyingglass")
+                                        }
+                                    }
+                                    .disabled(isDiscoveringModels || draft.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                }
                             }
 
                             fieldRow(L10n.text("field.model")) {
-                                TextField(L10n.text("placeholder.model"), text: $draft.model)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.body.monospaced())
+                                HStack(spacing: 8) {
+                                    TextField(L10n.text("placeholder.model"), text: $draft.model)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.body.monospaced())
+
+                                    if !discoveredModels.isEmpty {
+                                        Menu {
+                                            ForEach(discoveredModels, id: \.self) { model in
+                                                Button {
+                                                    draft.model = model
+                                                } label: {
+                                                    if draft.model == model {
+                                                        Label(model, systemImage: "checkmark")
+                                                    } else {
+                                                        Text(model)
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            Text(L10n.format("models.count", discoveredModels.count))
+                                        }
+                                        .menuStyle(.borderlessButton)
+                                        .fixedSize()
+                                    }
+                                }
                             }
+                        }
+
+                        if let modelDiscoveryMessage {
+                            Text(modelDiscoveryMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 10)
+                                .padding(.leading, 143)
+                                .textSelection(.enabled)
                         }
                     }
 
@@ -127,7 +175,7 @@ struct ProviderEditorView: View {
             Divider()
             footer
         }
-        .frame(width: 700, height: testResult == nil ? 610 : 720)
+        .frame(width: 760, height: testResult == nil ? 640 : 750)
         .onAppear {
             showKey = store.preferences.showKeysByDefault
             if let original, original.authentication == .bearer {
@@ -143,12 +191,14 @@ struct ProviderEditorView: View {
                brand != .automatic, brand != .custom {
                 draft.name = brand.displayName
             }
-            testResult = nil
+            clearDetectionResults()
         }
-        .onChange(of: draft.baseURL) { _ in testResult = nil }
+        .onChange(of: draft.baseURL) { _ in
+            if !applyingDetection { clearDetectionResults() }
+        }
         .onChange(of: draft.model) { _ in testResult = nil }
-        .onChange(of: draft.authentication) { _ in testResult = nil }
-        .onChange(of: apiKey) { _ in testResult = nil }
+        .onChange(of: draft.authentication) { _ in clearDetectionResults() }
+        .onChange(of: apiKey) { _ in clearDetectionResults() }
     }
 
     private var header: some View {
@@ -219,12 +269,43 @@ struct ProviderEditorView: View {
         }
     }
 
+    private func clearDetectionResults() {
+        testResult = nil
+        discoveredModels = []
+        modelDiscoveryMessage = nil
+    }
+
+    private func adoptResolvedBaseURL(_ baseURL: String?) {
+        guard let baseURL, baseURL != draft.baseURL else { return }
+        applyingDetection = true
+        draft.baseURL = baseURL
+        DispatchQueue.main.async { applyingDetection = false }
+    }
+
+    private func discoverModels() {
+        guard !isDiscoveringModels else { return }
+        isDiscoveringModels = true
+        modelDiscoveryMessage = nil
+        Task {
+            let report = await store.discoverModels(draft: draft, apiKey: apiKey)
+            adoptResolvedBaseURL(report.resolvedBaseURL)
+            discoveredModels = report.models
+            modelDiscoveryMessage = report.message
+            if draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let first = report.models.first {
+                draft.model = first
+            }
+            isDiscoveringModels = false
+        }
+    }
+
     private func runTest() {
         guard !isTesting else { return }
         isTesting = true
         testResult = nil
         Task {
             let report = await store.test(draft: draft, apiKey: apiKey)
+            adoptResolvedBaseURL(report.resolvedBaseURL)
             testResult = report
             isTesting = false
         }

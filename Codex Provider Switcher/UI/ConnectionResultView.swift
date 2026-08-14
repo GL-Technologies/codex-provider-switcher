@@ -45,6 +45,13 @@ struct ConnectionResultView: View {
             }
             .font(.caption)
 
+            if let resolved = report.resolvedBaseURL {
+                Text("Base URL · \(resolved)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
             if let code = report.statusCode {
                 Text("HTTP \(code) · \(report.endpoint)")
                     .font(.caption.monospaced())
