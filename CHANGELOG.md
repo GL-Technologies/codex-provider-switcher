@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.9
+
+- Introduced a shared native macOS design system for page width, spacing, card surfaces, corner radii, status colors, badges, icon tiles, empty states, and inline feedback.
+- Standardized the main window and sidebar proportions for a more balanced desktop layout.
+- Unified OpenAI and provider detail pages around the same header, route status, card, and metadata hierarchy.
+- Refined connection-test feedback with clearer success/warning/error hierarchy, protocol badges, endpoint metadata, and response disclosure.
+- Reworked Settings into consistent card sections with clearer bridge, credentials, storage, and security affordances.
+- Refined the installation/security guide and destructive/empty/loading states while preserving native light/dark mode behavior.
+- Centralized reusable visual primitives in `UI/AppDesign.swift` to reduce one-off styling and keep future UI changes consistent.
+
 ## 0.3.8
 
 - Expanded GitHub README navigation to English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish.
