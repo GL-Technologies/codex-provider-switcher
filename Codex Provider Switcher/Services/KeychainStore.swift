@@ -1,98 +1,43 @@
 import Foundation
-import Security
 
+/// Compatibility wrapper retained so existing app code does not need to change names.
+///
+/// GitHub release builds are currently ad-hoc signed. A rebuilt app can therefore fail
+/// macOS Keychain's caller identity check and cause a login-keychain password prompt on
+/// every update or launch. Until releases use a stable Developer ID signature, credentials
+/// are stored in an owner-only local file under ~/.codex/provider-switcher (0600).
 final class KeychainStore {
-    private let account = NSUserName()
-    private let servicePrefix = "io.github.GL-Technologies.CodexProviderSwitcher.provider."
-    private let legacyServicePrefix = "codex-interface-manager.provider."
-    private let legacyGlobalService = "codex-openai-compatible-api-key"
+    private let local: LocalCredentialStore
+
+    init() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let file = home
+            .appendingPathComponent(".codex", isDirectory: true)
+            .appendingPathComponent("provider-switcher", isDirectory: true)
+            .appendingPathComponent("credentials.json")
+        local = LocalCredentialStore(fileURL: file)
+    }
 
     func key(for id: UUID) -> String? {
-        if let value = read(service: service(for: id)) { return value }
-        if let legacy = read(service: legacyService(for: id)) {
-            try? save(legacy, for: id)
-            return legacy
-        }
-        return nil
+        local.key(for: id)
     }
 
     func hasKey(for id: UUID) -> Bool {
-        guard let value = key(for: id) else { return false }
-        return !value.isEmpty
+        local.hasKey(for: id)
     }
 
     func save(_ value: String, for id: UUID) throws {
-        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
-        guard !clean.contains("\n") && !clean.contains("\r") else {
-            throw NSError(domain: "KeychainStore", code: 1, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.key_newline")])
-        }
-
-        let service = service(for: id)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        let attributes: [String: Any] = [
-            kSecValueData as String: Data(clean.utf8),
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        if status == errSecItemNotFound {
-            var newItem = query
-            attributes.forEach { newItem[$0.key] = $0.value }
-            let addStatus = SecItemAdd(newItem as CFDictionary, nil)
-            guard addStatus == errSecSuccess else { throw keychainError(addStatus) }
-        } else if status != errSecSuccess {
-            throw keychainError(status)
-        }
+        try local.save(value, for: id)
     }
 
     func delete(for id: UUID) {
-        delete(service: service(for: id))
-        delete(service: legacyService(for: id))
+        local.delete(for: id)
     }
 
+    /// Legacy Keychain migration is intentionally no longer automatic. Reading the old
+    /// Keychain item is exactly what can trigger the recurring authorization dialog in
+    /// ad-hoc builds. Existing users only need to paste each provider key once into 0.3.6.
     func migrateLegacyGlobalKey(to id: UUID) {
-        guard !hasKey(for: id), let value = read(service: legacyGlobalService), !value.isEmpty else { return }
-        try? save(value, for: id)
-    }
-
-    private func service(for id: UUID) -> String {
-        servicePrefix + id.uuidString.lowercased()
-    }
-
-    private func legacyService(for id: UUID) -> String {
-        legacyServicePrefix + id.uuidString.lowercased()
-    }
-
-    private func read(service: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-
-    private func delete(service: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
-
-    private func keychainError(_ status: OSStatus) -> NSError {
-        let detail = SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)"
-        return NSError(domain: "KeychainStore", code: Int(status), userInfo: [NSLocalizedDescriptionKey: L10n.format("error.keychain", detail)])
+        // No-op by design. See comment above.
     }
 }

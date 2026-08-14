@@ -15,8 +15,8 @@ struct ProviderDetailView: View {
         !store.isOpenAIActive && store.activeProfileID == profile.id
     }
 
-    private var detectedIncompatible: Bool {
-        testResult?.success == true && testResult?.codexCompatible == false
+    private var isBridged: Bool {
+        store.bridgedProfileID == profile.id
     }
 
     var body: some View {
@@ -60,6 +60,14 @@ struct ProviderDetailView: View {
                             .padding(.vertical, 3)
                             .background(Color.green.opacity(0.10), in: Capsule())
                     }
+                    if isBridged {
+                        Text(L10n.text("bridge.badge"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.orange.opacity(0.12), in: Capsule())
+                    }
                 }
                 Text(profile.model)
                     .font(.callout)
@@ -82,8 +90,7 @@ struct ProviderDetailView: View {
                 Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isActive || store.isBusy || detectedIncompatible)
-            .help(detectedIncompatible ? L10n.text("test.chat_only_message") : "")
+            .disabled(isActive || store.isBusy)
 
             Menu {
                 Button(L10n.text("action.edit"), action: onEdit)
@@ -114,6 +121,8 @@ struct ProviderDetailView: View {
                 }
                 dividerRow
                 detailRow(L10n.text("details.reasoning"), L10n.reasoning(profile.reasoningEffort))
+                dividerRow
+                detailRow(L10n.text("bridge.status"), isBridged ? L10n.text("bridge.active") : L10n.text("bridge.inactive"))
                 dividerRow
                 detailRow(L10n.text("details.test_endpoint"), EndpointBuilder.responsesURL(from: profile.baseURL)?.absoluteString ?? "—", monospaced: true)
                 if !profile.note.isEmpty {

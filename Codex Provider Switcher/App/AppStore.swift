@@ -6,6 +6,7 @@ import SwiftUI
 final class AppStore: ObservableObject {
     @Published private(set) var profiles: [ProviderProfile] = []
     @Published private(set) var activeProfileID: UUID?
+    @Published private(set) var bridgedProfileID: UUID?
     @Published var notice: AppNotice?
     @Published var shouldOfferRestart = false
     @Published var shouldShowAccessSetup = false
@@ -17,6 +18,7 @@ final class AppStore: ObservableObject {
     let tester = ConnectionTester()
     let modelDiscovery = ModelDiscoveryService()
     let systemAccess = SystemAccessService()
+    let bridge = ChatCompletionsBridge()
     private lazy var repository = ProfileRepository(fileURL: configManager.profilesURL)
 
     init() {
@@ -122,9 +124,7 @@ final class AppStore: ObservableObject {
             try repository.save(profiles)
 
             if activeProfileID == profile.id && configManager.isManaged() {
-                let key = profile.authentication == .bearer ? keychain.key(for: profile.id) : nil
-                try configManager.switchToProvider(profile, apiKey: key)
-                offerRestartIfEnabled()
+                activate(profile)
             }
             refreshState()
             return true
@@ -134,7 +134,11 @@ final class AppStore: ObservableObject {
         }
     }
 
+    /// Resolves the provider protocol before writing Codex configuration.
+    /// Responses-compatible providers are used directly. Chat-Completions-only providers
+    /// are transparently routed through the localhost Responses bridge.
     func activate(_ profile: ProviderProfile) {
+        guard !isBusy else { return }
         let apiKey = profile.authentication == .bearer ? keychain.key(for: profile.id) : nil
         if profile.authentication == .bearer && (apiKey?.isEmpty ?? true) {
             notice = AppNotice(title: L10n.text("error.missing_key_title"), message: L10n.text("error.missing_key"))
@@ -142,20 +146,53 @@ final class AppStore: ObservableObject {
         }
 
         isBusy = true
-        defer { isBusy = false }
-        do {
-            try configManager.switchToProvider(profile, apiKey: apiKey)
-            refreshState()
-            offerRestartIfEnabled()
-        } catch {
-            notice = AppNotice(title: L10n.text("error.switch_title"), message: error.localizedDescription)
+        Task {
+            let report = await tester.test(profile: profile, apiKey: apiKey)
+            do {
+                if report.codexCompatible {
+                    bridge.stop()
+                    bridgedProfileID = nil
+                    var resolved = profile
+                    if let base = report.resolvedBaseURL { resolved.baseURL = base }
+                    try configManager.switchToProvider(resolved, apiKey: apiKey)
+                } else if report.success && report.detectedAPI == .chatCompletions {
+                    var upstream = profile
+                    if let base = report.resolvedBaseURL { upstream.baseURL = base }
+                    let localBase = try await bridge.start(profile: upstream, apiKey: apiKey)
+                    let bridged = ProviderProfile(
+                        id: profile.id,
+                        name: profile.name + " Bridge",
+                        model: profile.model,
+                        baseURL: localBase,
+                        brand: profile.brand,
+                        authentication: .none,
+                        reasoningEffort: profile.reasoningEffort,
+                        note: profile.note,
+                        createdAt: profile.createdAt,
+                        updatedAt: Date()
+                    )
+                    try configManager.switchToProvider(bridged, apiKey: nil)
+                    bridgedProfileID = profile.id
+                    notice = AppNotice(title: L10n.text("bridge.enabled_title"), message: L10n.format("bridge.enabled_message", localBase))
+                } else {
+                    throw NSError(domain: "ProviderActivation", code: 1, userInfo: [NSLocalizedDescriptionKey: report.message])
+                }
+                refreshState()
+                offerRestartIfEnabled()
+            } catch {
+                notice = AppNotice(title: L10n.text("error.switch_title"), message: error.localizedDescription)
+            }
+            isBusy = false
         }
     }
 
     func activateOpenAI() {
+        guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
         do {
+            bridge.stop()
+            bridgedProfileID = nil
             try configManager.switchToOpenAI()
             refreshState()
             offerRestartIfEnabled()
@@ -188,6 +225,8 @@ final class AppStore: ObservableObject {
     func delete(_ profile: ProviderProfile) {
         do {
             if activeProfileID == profile.id && configManager.isManaged() {
+                bridge.stop()
+                bridgedProfileID = nil
                 try configManager.switchToOpenAI()
                 offerRestartIfEnabled()
             }
