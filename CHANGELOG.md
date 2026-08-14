@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.11
+
+- Fixed OpenAI restore when an older saved baseline itself contained a third-party `model_provider`; restore now sanitizes the active provider selection instead of blindly copying the baseline back.
+- OpenAI restore now removes the switcher's managed provider block and managed API-key environment entry, then verifies that Codex no longer selects a custom provider before reporting success.
+- Added regression tests for stale third-party baselines, managed bridge configurations, and preservation of explicit official OpenAI model choices.
+- Moved localized README files out of the repository root into `docs/i18n/` and updated language navigation, reducing top-level clutter while keeping `README.md` as the GitHub landing page.
+
 ## 0.3.10
 
 - Removed the duplicate Auto Bridge control from provider details; Auto Bridge now has one primary home in the sidebar while detail pages show route status only.
