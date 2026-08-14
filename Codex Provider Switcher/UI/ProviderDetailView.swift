@@ -4,8 +4,6 @@ struct ProviderDetailView: View {
     @EnvironmentObject private var store: AppStore
     let profile: ProviderProfile
     let onEdit: () -> Void
-    let onDuplicate: () -> Void
-    let onDelete: () -> Void
 
     @State private var isTesting = false
     @State private var testResult: ConnectionTestReport?
@@ -69,6 +67,12 @@ struct ProviderDetailView: View {
             Spacer()
 
             Button {
+                onEdit()
+            } label: {
+                Label(L10n.text("action.edit"), systemImage: "pencil")
+            }
+
+            Button {
                 runTest()
                 section = 1
             } label: {
@@ -83,25 +87,15 @@ struct ProviderDetailView: View {
             }
             .disabled(isTesting)
 
-            Button {
-                store.activate(profile)
-            } label: {
-                Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
+            if !isActive {
+                Button {
+                    store.activate(profile)
+                } label: {
+                    Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(store.isBusy)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isActive || store.isBusy)
-
-            Menu {
-                Button(L10n.text("action.edit"), action: onEdit)
-                Button(L10n.text("action.duplicate"), action: onDuplicate)
-                Divider()
-                Button(L10n.text("action.delete"), role: .destructive, action: onDelete)
-            } label: {
-                Image(systemName: "ellipsis")
-                    .frame(width: 20, height: 20)
-            }
-            .menuStyle(.borderlessButton)
-            .frame(width: 30)
         }
     }
 
@@ -126,18 +120,10 @@ struct ProviderDetailView: View {
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(L10n.text("bridge.auto"))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Toggle("", isOn: Binding(
-                        get: { store.autoBridgeEnabled },
-                        set: { store.setAutoBridgeEnabled($0) }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .disabled(store.isBusy)
+                if isBridged {
+                    AppStatusPill(text: L10n.text("bridge.badge"), tone: .warning, systemImage: "arrow.triangle.branch")
+                } else if isActive {
+                    AppStatusPill(text: L10n.text("menu.direct_active"), tone: .success, systemImage: "bolt.horizontal.circle")
                 }
             }
         }
@@ -145,7 +131,7 @@ struct ProviderDetailView: View {
 
     private var routeTitle: String {
         if isBridged { return L10n.text("bridge.active") }
-        if isActive { return L10n.text("bridge.inactive") }
+        if isActive { return L10n.text("menu.direct_active") }
         return profile.resolvedBrand.displayName
     }
 
