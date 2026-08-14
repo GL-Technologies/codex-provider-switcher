@@ -19,6 +19,19 @@ struct CodexProviderSwitcherApp: App {
             }
 
             CommandMenu(L10n.text("details.provider")) {
+                if let profile = store.commandProfile {
+                    if store.isOpenAIActive || store.activeProfileID != profile.id {
+                        Button {
+                            store.activate(profile)
+                        } label: {
+                            Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .disabled(store.isBusy || !store.hasKey(for: profile))
+
+                        Divider()
+                    }
+                }
+
                 Button {
                     NotificationCenter.default.post(name: .editSelectedProviderRequested, object: nil)
                 } label: {
