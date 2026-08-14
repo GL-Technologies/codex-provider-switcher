@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.10
+
+- Removed the duplicate Auto Bridge control from provider details; Auto Bridge now has one primary home in the sidebar while detail pages show route status only.
+- Replaced the provider detail overflow menu with visible Edit, Test, and Use actions that match the selected provider's primary workflow.
+- Added native right-click context menus to provider rows for Edit, Duplicate, and Delete, with Delete using the destructive role and the existing confirmation flow.
+- Added a macOS Provider menu so context-menu commands remain available through the app menu bar, following Apple's guidance that contextual actions should not be context-menu-only.
+- Moved Add Provider out of the bottom of the sidebar into the window toolbar while preserving Command-N in the menu bar.
+- Kept the sidebar footer focused on the global Auto Bridge state and noncritical Help access.
+- Documented the interaction-placement rules in `docs/UX_NOTES.md` for future UI changes.
+
 ## 0.3.9
 
 - Introduced a shared native macOS design system for page width, spacing, card surfaces, corner radii, status colors, badges, icon tiles, empty states, and inline feedback.
