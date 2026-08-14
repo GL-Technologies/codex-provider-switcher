@@ -28,10 +28,10 @@ struct AccessSetupView: View {
                 Divider().padding(.leading, 54)
                 setupRow(number: "3", title: L10n.text("access.step_privacy"), detail: L10n.text("access.step_privacy_detail"))
             }
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.separator.opacity(0.45), lineWidth: 1)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
             }
 
             if let status {
@@ -67,7 +67,7 @@ struct AccessSetupView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
-                .background(.quaternary, in: Circle())
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.body.weight(.medium))
                 Text(detail).font(.callout).foregroundStyle(.secondary)
