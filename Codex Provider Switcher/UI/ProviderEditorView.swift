@@ -134,6 +134,17 @@ struct ProviderEditorView: View {
                 apiKey = store.key(for: original)
             }
         }
+        .onChange(of: draft.brand) { brand in
+            if draft.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let preset = ProviderPreset.baseURL(for: brand) {
+                draft.baseURL = preset
+            }
+            if draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               brand != .automatic, brand != .custom {
+                draft.name = brand.displayName
+            }
+            testResult = nil
+        }
         .onChange(of: draft.baseURL) { _ in testResult = nil }
         .onChange(of: draft.model) { _ in testResult = nil }
         .onChange(of: draft.authentication) { _ in testResult = nil }
