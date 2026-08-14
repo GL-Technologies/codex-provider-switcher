@@ -83,7 +83,13 @@ struct MainView: View {
         } message: { _ in
             Text(L10n.text("delete.message"))
         }
-        .onAppear { syncSelectionToActiveProfile() }
+        .onAppear {
+            syncSelectionToActiveProfile()
+            syncCommandSelection()
+        }
+        .onChange(of: selection) { _ in
+            syncCommandSelection()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .addProviderRequested)) { _ in
             isAdding = true
         }
@@ -146,6 +152,14 @@ struct MainView: View {
             selection = .provider(id)
         } else {
             selection = .openAI
+        }
+    }
+
+    private func syncCommandSelection() {
+        if case .provider(let id) = selection {
+            store.commandProfileID = id
+        } else {
+            store.commandProfileID = nil
         }
     }
 }
