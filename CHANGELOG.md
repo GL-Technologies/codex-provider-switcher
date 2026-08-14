@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5
+
+- Added conservative Base URL auto-discovery: the exact URL is tried first, then `/v1` only when the user entered a host/root URL.
+- Preserves explicit vendor paths such as `/api/paas/v4` instead of replacing them with `/v1`.
+- Connection tests now probe all candidate Base URLs for Responses API before falling back to Chat Completions diagnostics.
+- Successful tests automatically adopt the resolved Base URL in the provider editor.
+- Added model discovery through OpenAI-compatible `GET /models` endpoints, with a selectable model menu and manual-entry fallback.
+- Added localized endpoint/model discovery status text in all supported UI languages.
+- Connection diagnostics now show the resolved Base URL used by the successful request.
+
 ## 0.3.4
 
 - Replaced the macOS permission gate with an installation/security guide for approving unsigned builds through System Settings → Privacy & Security → Open Anyway.
