@@ -89,10 +89,14 @@ struct MainView: View {
                 )
                 .environmentObject(store)
             } else {
-                ContentUnavailableView(
-                    L10n.text("provider.not_found"),
-                    systemImage: "network.slash"
-                )
+                VStack(spacing: 10) {
+                    Image(systemName: "network.slash")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text(L10n.text("provider.not_found"))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
