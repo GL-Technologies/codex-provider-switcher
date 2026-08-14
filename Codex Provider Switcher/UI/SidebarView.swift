@@ -46,10 +46,10 @@ struct SidebarView: View {
                 Button {
                     store.showAccessSetup()
                 } label: {
-                    Image(systemName: "lock.shield")
+                    Image(systemName: "questionmark.circle")
                 }
                 .buttonStyle(.borderless)
-                .help(L10n.text("access.title"))
+                .help(L10n.text("guide.title"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
