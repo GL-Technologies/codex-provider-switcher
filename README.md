@@ -5,27 +5,48 @@
 </p>
 
 <p align="center">
-  <a href="README.zh-CN.md">简体中文</a>
+  <strong>A native macOS provider switcher and compatibility bridge for Codex.</strong>
 </p>
 
-A native macOS utility for switching Codex between OpenAI and multiple OpenAI-compatible model providers.
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+</p>
 
-> This project is not affiliated with or endorsed by OpenAI or the provider brands shown in the app.
+<p align="center">
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-orange?logo=swift">
+  <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Release" src="https://img.shields.io/github/v/release/GL-Technologies/codex-provider-switcher">
+</p>
 
-## Features
+Codex Provider Switcher is a native macOS utility for switching Codex between OpenAI and multiple OpenAI-compatible providers. It can connect native Responses API providers directly, and transparently bridge Chat-Completions-only providers through a local Responses-compatible endpoint.
 
-- Save and switch between multiple provider profiles.
-- Auto-discover Base URL variants and compatible `/models` endpoints.
-- Test Responses API and Chat Completions automatically.
-- Connect native Responses providers directly.
-- **Auto Bridge** Chat-Completions-only providers to Codex through a localhost Responses endpoint.
-- Convert Codex functions, custom/freeform tools, tool search, namespaces, common reasoning output, and usage metadata across the bridge.
-- Restore bridged routing after the app relaunches.
-- Keep quick switching and bridge status in the macOS menu bar.
-- Restore the original OpenAI Codex configuration with one click.
-- Back up `~/.codex/config.toml` and `~/.codex/.env` before changes.
-- Native SwiftUI interface with light/dark mode.
-- English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish UI.
+> This project is not affiliated with or endorsed by OpenAI or any provider brand shown in the app.
+
+## Highlights
+
+- **One-click provider switching** between OpenAI and multiple saved providers.
+- **Auto Bridge** for Chat-Completions-only APIs, enabled by default.
+- **Automatic capability detection**: Responses API first, Chat Completions fallback.
+- **Model discovery** through compatible `/models` endpoints with manual fallback.
+- **Codex tool compatibility** across the bridge, including functions, custom/freeform tools, tool search, namespaces, common reasoning output, and usage metadata.
+- **Persistent menu bar control** for quick switching, bridge status, Settings, and Quit.
+- **Automatic bridge restoration** when the app relaunches and Codex still points to localhost.
+- **Safe configuration handling** with backups before changing `~/.codex/config.toml` and `~/.codex/.env`.
+- **Native SwiftUI experience** with light/dark mode and localized UI.
+- UI languages: English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish.
+
+## How it works
+
+```text
+Native Responses provider
+Codex ───────────────────────────────→ Provider /responses
+
+Chat-Completions-only provider
+Codex → localhost Responses bridge → Provider /chat/completions
+```
+
+The bridge is localhost-only and runs inside Codex Provider Switcher. Closing the main window is safe; the menu bar item keeps the app alive. Quitting the app stops the bridge.
 
 ## Requirements
 
@@ -37,27 +58,19 @@ A native macOS utility for switching Codex between OpenAI and multiple OpenAI-co
 
 Download the latest build from **Releases**, unzip it, and move **Codex Provider Switcher.app** to Applications.
 
-The current GitHub release is ad-hoc signed. If macOS blocks first launch, try opening the app once, then go to **System Settings → Privacy & Security** and choose **Open Anyway**.
+The current GitHub release is ad-hoc signed. If macOS blocks the first launch, try opening the app once, then go to **System Settings → Privacy & Security** and choose **Open Anyway**.
 
-## Use
+## Quick start
 
-1. Add a provider with its Base URL, model ID, and API key. The provider name can be left blank and will be generated automatically.
-2. Use **Discover Models** when the provider exposes a compatible `/models` endpoint.
-3. Run **Test Connection**. Responses is probed first; Chat Completions is used as the fallback capability check.
-4. Select **Switch**.
-   - Native Responses: Codex connects directly.
-   - Chat-Completions-only: **Auto Bridge** routes Codex through localhost automatically. Auto Bridge is on by default.
+1. Click **Add Provider** and enter the Base URL, model ID, and API key. The provider name can be left blank and will be generated automatically.
+2. Click **Find Models** when the provider exposes a compatible `/models` endpoint.
+3. Click **Test Connection**. The app probes Responses first and Chat Completions second.
+4. Click **Use**.
+   - Native Responses providers connect directly.
+   - Chat-Completions-only providers use **Auto Bridge** automatically when enabled.
 5. Relaunch Codex when prompted.
-6. Use the menu bar item for quick provider switching or to reopen the main window.
-7. Select **OpenAI → Use OpenAI** whenever you want to restore the original configuration.
-
-A bridged provider requires Codex Provider Switcher to remain running. Closing the main window is safe; the menu bar item keeps the app alive. Quitting the app stops the bridge.
-
-## Base URL and model discovery
-
-Provider URL layouts are not standardized. The app preserves explicit vendor paths such as `/api/paas/v4`, tries known provider presets where appropriate, and only tries `/v1` when the user supplied a bare host/root URL. It never replaces an explicit vendor version path with a guessed `/v1`.
-
-Model discovery uses compatible `GET /models` endpoints when available. Manual model entry remains available for providers that do not expose a model catalog.
+6. Use the menu bar item to switch providers without reopening the main window.
+7. Choose **OpenAI → Use OpenAI** whenever you want to restore the original configuration.
 
 ## Auto Bridge
 
@@ -71,9 +84,15 @@ Codex
 Provider /chat/completions
 ```
 
-The bridge is localhost-only. Its transformation layer handles normal messages, standard functions, Codex custom/freeform tools, tool search, namespaces, common reasoning text, and usage metadata. It also normalizes strict Chat gateways that reject multiple system messages or malformed tool schemas.
+The transformation layer handles normal messages, standard functions, Codex custom/freeform tools, tool search, namespaces, common reasoning text, usage metadata, and strict Chat gateway normalization.
 
 See [docs/BRIDGE.md](docs/BRIDGE.md) for architecture, supported conversions, and deliberate limits.
+
+## Base URL and model discovery
+
+Provider URL layouts are not standardized. The app preserves explicit vendor paths such as `/api/paas/v4`, tries known provider presets where appropriate, and only tries `/v1` when the user supplied a bare host/root URL. It never replaces an explicit vendor version path with a guessed `/v1`.
+
+Model discovery uses compatible `GET /models` endpoints when available. Manual model entry remains available for providers that do not expose a model catalog.
 
 ## Credential storage
 
@@ -142,7 +161,7 @@ scripts/                            Local build/package scripts
 
 ## Compatibility research
 
-The v0.3.7 bridge review studied the public, MIT-licensed CC Switch project and its mature Codex routing design. Codex Provider Switcher uses an independent native Swift implementation. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The bridge review studied the public, MIT-licensed CC Switch project and its mature Codex routing design. Codex Provider Switcher uses an independent native Swift implementation. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Contributing
 
