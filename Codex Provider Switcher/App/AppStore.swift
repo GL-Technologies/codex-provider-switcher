@@ -12,6 +12,7 @@ final class AppStore: ObservableObject {
     @Published var shouldOfferRestart = false
     @Published var shouldShowAccessSetup = false
     @Published var isBusy = false
+    @Published var commandProfileID: UUID?
 
     var preferences: AppPreferences
     let configManager = ConfigManager()
@@ -51,6 +52,11 @@ final class AppStore: ObservableObject {
     var activeProfile: ProviderProfile? {
         guard let activeProfileID else { return nil }
         return profiles.first(where: { $0.id == activeProfileID })
+    }
+
+    var commandProfile: ProviderProfile? {
+        guard let commandProfileID else { return nil }
+        return profiles.first(where: { $0.id == commandProfileID })
     }
 
     func profile(id: UUID) -> ProviderProfile? {
@@ -240,6 +246,9 @@ final class AppStore: ObservableObject {
             profiles.removeAll { $0.id == profile.id }
             try repository.save(profiles)
             keychain.delete(for: profile.id)
+            if commandProfileID == profile.id {
+                commandProfileID = nil
+            }
             refreshState()
         } catch {
             notice = AppNotice(title: L10n.text("error.delete_title"), message: error.localizedDescription)
