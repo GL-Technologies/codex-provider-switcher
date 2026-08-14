@@ -4,6 +4,10 @@
   <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
 </p>
 
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 A native macOS utility for switching Codex between your original OpenAI configuration and multiple OpenAI **Responses API-compatible** providers.
 
 > This project is not affiliated with or endorsed by OpenAI.
