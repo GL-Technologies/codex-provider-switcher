@@ -1,7 +1,7 @@
 # Codex Provider Switcher
 
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher 图标">
+  <img src="https://raw.githubusercontent.com/GL-Technologies/codex-provider-switcher/main/docs/app-icon.png" width="112" alt="Codex Provider Switcher 图标">
 </p>
 
 <p align="center">
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · 简体中文 · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+  <a href="../../README.md">English</a> · 简体中文 · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@ Codex
 
 Bridge 只监听 `127.0.0.1`。转换层覆盖普通消息、function tools、Codex custom/freeform tools、tool search、namespace、常见 reasoning 文本与 usage，并处理部分严格兼容网关对 system 消息和工具 schema 的限制。
 
-详细设计和已知边界见 [docs/BRIDGE.md](docs/BRIDGE.md)。
+详细设计和已知边界见 [docs/BRIDGE.md](../BRIDGE.md)。
 
 ## API Key 存储
 
@@ -137,7 +137,7 @@ GitHub Actions 会在发布前执行 Swift 单元测试和真实 Xcode macOS 构
 
 ## 开源兼容性参考
 
-桥接兼容性审查参考了 MIT 开源项目 CC Switch 的 Codex 路由设计，但本项目使用独立的原生 Swift 实现。说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+桥接兼容性审查参考了 MIT 开源项目 CC Switch 的 Codex 路由设计，但本项目使用独立的原生 Swift 实现。说明见 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)。
 
 ## License
 

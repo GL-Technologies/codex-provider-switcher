@@ -1,11 +1,11 @@
 # Codex Provider Switcher
 
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
+  <img src="https://raw.githubusercontent.com/GL-Technologies/codex-provider-switcher/main/docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · 한국어 · <a href="README.es.md">Español</a>
+  <a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · 한국어 · <a href="README.es.md">Español</a>
 </p>
 
 Codex를 OpenAI와 여러 OpenAI 호환 공급자 사이에서 전환할 수 있는 네이티브 macOS 유틸리티입니다. Chat Completions만 지원하는 API도 로컬 Responses 호환 브리지를 통해 Codex에서 사용할 수 있습니다.
@@ -64,7 +64,7 @@ API Key는 다음 위치에 저장됩니다.
 
 파일 권한은 `0600`, 상태 디렉터리는 `0700`입니다. 공급자 설정과 백업도 `~/.codex/provider-switcher/` 아래에 저장됩니다.
 
-브리지 아키텍처와 지원 범위는 [docs/BRIDGE.md](docs/BRIDGE.md)를 참고하세요.
+브리지 아키텍처와 지원 범위는 [docs/BRIDGE.md](../BRIDGE.md)를 참고하세요.
 
 ## License
 

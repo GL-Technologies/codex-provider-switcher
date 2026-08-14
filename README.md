@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+  English · <a href="docs/i18n/README.zh-CN.md">简体中文</a> · <a href="docs/i18n/README.zh-TW.md">繁體中文</a> · <a href="docs/i18n/README.ja.md">日本語</a> · <a href="docs/i18n/README.ko.md">한국어</a> · <a href="docs/i18n/README.es.md">Español</a>
 </p>
 
 <p align="center">
@@ -70,7 +70,7 @@ The current GitHub release is ad-hoc signed. If macOS blocks the first launch, t
    - Chat-Completions-only providers use **Auto Bridge** automatically when enabled.
 5. Relaunch Codex when prompted.
 6. Use the menu bar item to switch providers without reopening the main window.
-7. Choose **OpenAI → Use OpenAI** whenever you want to restore the original configuration.
+7. Choose **OpenAI → Use OpenAI** whenever you want to restore the signed-in OpenAI/ChatGPT route.
 
 ## Auto Bridge
 
@@ -154,6 +154,9 @@ Codex Provider Switcher/
   Services/                         Credentials, bridge, files, networking
   UI/                               SwiftUI and menu bar UI
   Localization/                     Localization helpers
+docs/
+  i18n/                             Localized README files
+  BRIDGE.md                         Bridge architecture and limits
 Tests/                              Core unit tests
 scripts/                            Local build/package scripts
 .github/workflows/                  CI and release automation

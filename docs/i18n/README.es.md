@@ -1,11 +1,11 @@
 # Codex Provider Switcher
 
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
+  <img src="https://raw.githubusercontent.com/GL-Technologies/codex-provider-switcher/main/docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · Español
+  <a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · Español
 </p>
 
 Una utilidad nativa para macOS que permite cambiar Codex entre OpenAI y varios proveedores compatibles con OpenAI. Las API que solo ofrecen Chat Completions pueden usarse mediante un puente local compatible con Responses.
@@ -64,7 +64,7 @@ Las API Key se guardan en:
 
 El archivo usa permisos `0600` y el directorio de estado `0700`. La configuración de proveedores y las copias de seguridad también se almacenan en `~/.codex/provider-switcher/`.
 
-Consulta [docs/BRIDGE.md](docs/BRIDGE.md) para conocer la arquitectura y los límites del puente.
+Consulta [docs/BRIDGE.md](../BRIDGE.md) para conocer la arquitectura y los límites del puente.
 
 ## License
 

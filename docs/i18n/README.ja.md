@@ -1,11 +1,11 @@
 # Codex Provider Switcher
 
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
+  <img src="https://raw.githubusercontent.com/GL-Technologies/codex-provider-switcher/main/docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · 日本語 · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+  <a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · 日本語 · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
 </p>
 
 Codex を OpenAI と複数の OpenAI 互換プロバイダー間で切り替えるためのネイティブ macOS ユーティリティです。Chat Completions のみを提供する API は、ローカルの Responses 互換ブリッジを通じて Codex から利用できます。
@@ -64,7 +64,7 @@ API Key は次の場所に保存されます。
 
 ファイル権限は `0600`、状態ディレクトリは `0700` です。プロバイダー設定とバックアップも `~/.codex/provider-switcher/` 以下に保存されます。
 
-ブリッジの詳細は [docs/BRIDGE.md](docs/BRIDGE.md) を参照してください。
+ブリッジの詳細は [docs/BRIDGE.md](../BRIDGE.md) を参照してください。
 
 ## License
 

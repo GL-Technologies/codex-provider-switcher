@@ -1,11 +1,11 @@
 # Codex Provider Switcher
 
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
+  <img src="https://raw.githubusercontent.com/GL-Technologies/codex-provider-switcher/main/docs/app-icon.png" width="112" alt="Codex Provider Switcher icon">
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · 繁體中文 · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+  <a href="../../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · 繁體中文 · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
 </p>
 
 一款原生 macOS 工具，用來在 OpenAI 與多個 OpenAI 相容服務之間快速切換 Codex，並可自動把只支援 Chat Completions 的服務橋接為 Codex 可使用的 Responses API。
@@ -66,7 +66,7 @@ Provider API Key 儲存在：
 
 橋接 Provider 的上游 Key 保留在 Codex Provider Switcher 內；直接連線的 Responses Provider 則可能需要把目前 Key 寫入 `~/.codex/.env` 供 Codex 讀取。
 
-更多橋接架構與支援範圍請參閱 [docs/BRIDGE.md](docs/BRIDGE.md)。
+更多橋接架構與支援範圍請參閱 [docs/BRIDGE.md](../BRIDGE.md)。
 
 ## License
 
