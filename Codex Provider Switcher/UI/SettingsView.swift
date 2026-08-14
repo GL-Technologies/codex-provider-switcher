@@ -11,6 +11,13 @@ struct SettingsView: View {
                 Button(L10n.text("guide.title")) { store.showAccessSetup() }
             }
 
+            Section(L10n.text("settings.credentials")) {
+                Text(L10n.text("settings.credentials_detail"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
             Section(L10n.text("settings.storage")) {
                 LabeledContent(L10n.text("settings.codex_folder")) {
                     HStack {
@@ -33,6 +40,6 @@ struct SettingsView: View {
             }
         }
         .padding(12)
-        .frame(width: 650, height: 330)
+        .frame(width: 680, height: 420)
     }
 }
