@@ -32,7 +32,7 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 10) {
+            VStack(spacing: 9) {
                 bridgeControl
 
                 HStack(spacing: 8) {
@@ -40,8 +40,7 @@ struct SidebarView: View {
                         NotificationCenter.default.post(name: .addProviderRequested, object: nil)
                     } label: {
                         Label(L10n.text("action.add_provider"), systemImage: "plus")
-                            .labelStyle(.iconOnly)
-                            .frame(width: 24, height: 24)
+                            .font(.callout.weight(.medium))
                     }
                     .buttonStyle(.borderless)
                     .help(L10n.text("action.add_provider"))
@@ -52,6 +51,7 @@ struct SidebarView: View {
                         store.showAccessSetup()
                     } label: {
                         Image(systemName: "questionmark.circle")
+                            .font(.callout)
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.borderless)
@@ -60,24 +60,21 @@ struct SidebarView: View {
                 .padding(.horizontal, 4)
             }
             .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 9)
+            .padding(.top, 9)
+            .padding(.bottom, 10)
             .background(.bar)
         }
     }
 
     private var bridgeControl: some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(store.autoBridgeEnabled ? Color.green.opacity(0.14) : Color.secondary.opacity(0.10))
-                    .frame(width: 32, height: 32)
-                Image(systemName: "point.3.connected.trianglepath.dotted")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(store.autoBridgeEnabled ? .green : .secondary)
-            }
+            AppIconTile(
+                systemImage: "point.3.connected.trianglepath.dotted",
+                tone: store.autoBridgeEnabled ? .success : .neutral,
+                size: 34
+            )
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.text("bridge.auto"))
                     .font(.caption.weight(.semibold))
                 Text(store.autoBridgeEnabled ? L10n.text("bridge.active") : L10n.text("bridge.inactive"))
@@ -99,10 +96,10 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(AppDesign.surface, in: RoundedRectangle(cornerRadius: AppDesign.compactRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppDesign.compactRadius, style: .continuous)
+                .strokeBorder(AppDesign.separator, lineWidth: 1)
         }
         .help(L10n.text("bridge.auto_help"))
     }
@@ -129,10 +126,8 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .help(L10n.text("key.missing"))
             } else if active {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-                    .help(L10n.text("status.active"))
+                AppStatusPill(text: L10n.text("status.active"), tone: .success, systemImage: "checkmark")
+                    .labelStyle(.iconOnly)
             }
         }
         .padding(.vertical, 5)
