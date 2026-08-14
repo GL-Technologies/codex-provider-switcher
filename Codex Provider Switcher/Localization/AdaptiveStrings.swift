@@ -25,7 +25,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Responses test: %@\nChat Completions test: %@",
             "test.detected_protocol": "Detected",
             "test.codex_direct": "Direct Codex",
-            "test.protocol_unknown": "Unknown"
+            "test.protocol_unknown": "Unknown",
+            "models.discover": "Find Models",
+            "models.count": "%d models",
+            "models.invalid_url": "Enter a valid Base URL first.",
+            "models.missing_key": "Enter the API key before discovering models.",
+            "models.found": "Found %d models. Select one from the model menu.",
+            "models.unsupported": "This provider does not expose a compatible model-list endpoint. Enter the model ID manually.",
+            "models.failed": "Model discovery failed: %@"
         ],
         "zh-Hans": [
             "guide.title": "安装与安全",
@@ -44,7 +51,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Responses 测试：%@\nChat Completions 测试：%@",
             "test.detected_protocol": "检测协议",
             "test.codex_direct": "Codex 可直连",
-            "test.protocol_unknown": "未知"
+            "test.protocol_unknown": "未知",
+            "models.discover": "探测模型",
+            "models.count": "%d 个模型",
+            "models.invalid_url": "请先填写有效的 Base URL。",
+            "models.missing_key": "探测模型前请先填写 API Key。",
+            "models.found": "发现 %d 个模型，可从模型菜单中选择。",
+            "models.unsupported": "该厂商未提供兼容的模型列表接口，请手动填写模型 ID。",
+            "models.failed": "模型探测失败：%@"
         ],
         "zh-Hant": [
             "guide.title": "安裝與安全性",
@@ -63,7 +77,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Responses 測試：%@\nChat Completions 測試：%@",
             "test.detected_protocol": "偵測協定",
             "test.codex_direct": "Codex 可直連",
-            "test.protocol_unknown": "未知"
+            "test.protocol_unknown": "未知",
+            "models.discover": "偵測模型",
+            "models.count": "%d 個模型",
+            "models.invalid_url": "請先輸入有效的 Base URL。",
+            "models.missing_key": "偵測模型前請先輸入 API Key。",
+            "models.found": "找到 %d 個模型，可從模型選單中選擇。",
+            "models.unsupported": "此供應商沒有相容的模型清單端點，請手動輸入模型 ID。",
+            "models.failed": "模型偵測失敗：%@"
         ],
         "ja": [
             "guide.title": "インストールとセキュリティ",
@@ -82,7 +103,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Responses テスト: %@\nChat Completions テスト: %@",
             "test.detected_protocol": "検出",
             "test.codex_direct": "Codex 直結",
-            "test.protocol_unknown": "不明"
+            "test.protocol_unknown": "不明",
+            "models.discover": "モデルを検索",
+            "models.count": "%d モデル",
+            "models.invalid_url": "有効な Base URL を入力してください。",
+            "models.missing_key": "モデル検索の前に API Key を入力してください。",
+            "models.found": "%d 個のモデルが見つかりました。モデルメニューから選択できます。",
+            "models.unsupported": "互換モデル一覧 API がありません。モデル ID を手動入力してください。",
+            "models.failed": "モデル検索に失敗しました: %@"
         ],
         "ko": [
             "guide.title": "설치 및 보안",
@@ -101,7 +129,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Responses 테스트: %@\nChat Completions 테스트: %@",
             "test.detected_protocol": "감지된 프로토콜",
             "test.codex_direct": "Codex 직접 연결",
-            "test.protocol_unknown": "알 수 없음"
+            "test.protocol_unknown": "알 수 없음",
+            "models.discover": "모델 검색",
+            "models.count": "모델 %d개",
+            "models.invalid_url": "유효한 Base URL을 먼저 입력하세요.",
+            "models.missing_key": "모델 검색 전에 API Key를 입력하세요.",
+            "models.found": "모델 %d개를 찾았습니다. 모델 메뉴에서 선택할 수 있습니다.",
+            "models.unsupported": "호환되는 모델 목록 API가 없습니다. 모델 ID를 직접 입력하세요.",
+            "models.failed": "모델 검색 실패: %@"
         ],
         "es": [
             "guide.title": "Instalación y seguridad",
@@ -120,7 +155,14 @@ enum AdaptiveStrings {
             "test.auto_failed": "Prueba Responses: %@\nPrueba Chat Completions: %@",
             "test.detected_protocol": "Detectado",
             "test.codex_direct": "Codex directo",
-            "test.protocol_unknown": "Desconocido"
+            "test.protocol_unknown": "Desconocido",
+            "models.discover": "Buscar modelos",
+            "models.count": "%d modelos",
+            "models.invalid_url": "Introduce primero una Base URL válida.",
+            "models.missing_key": "Introduce la API Key antes de buscar modelos.",
+            "models.found": "Se encontraron %d modelos. Puedes elegir uno en el menú de modelos.",
+            "models.unsupported": "Este proveedor no expone una lista de modelos compatible. Introduce el ID manualmente.",
+            "models.failed": "No se pudieron buscar los modelos: %@"
         ]
     ]
 }
