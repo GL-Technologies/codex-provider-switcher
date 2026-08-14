@@ -15,87 +15,91 @@ A native macOS utility for switching Codex between OpenAI and multiple OpenAI-co
 ## Features
 
 - Save and switch between multiple provider profiles.
-- Auto-discover common Base URL variants and OpenAI-compatible `/models` endpoints.
-- Test both Responses API and Chat Completions compatibility.
-- Use Responses-compatible providers directly.
-- Route Chat-Completions-only providers through a built-in localhost Responses bridge.
-- Translate standard text conversations and function-tool loops between Responses and Chat Completions.
-- Restore the original Codex configuration with one click.
+- Auto-discover Base URL variants and compatible `/models` endpoints.
+- Test Responses API and Chat Completions automatically.
+- Connect native Responses providers directly.
+- **Auto Bridge** Chat-Completions-only providers to Codex through a localhost Responses endpoint.
+- Convert Codex functions, custom/freeform tools, tool search, namespaces, common reasoning output, and usage metadata across the bridge.
+- Restore bridged routing after the app relaunches.
+- Keep quick switching and bridge status in the macOS menu bar.
+- Restore the original OpenAI Codex configuration with one click.
 - Back up `~/.codex/config.toml` and `~/.codex/.env` before changes.
-- Native macOS UI with light/dark mode and provider identities.
-- Localized for English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish.
+- Native SwiftUI interface with light/dark mode.
+- English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish UI.
 
 ## Requirements
 
 - macOS 13 or later.
 - Codex already installed and configured.
-- An OpenAI-compatible provider exposing either Responses API or Chat Completions.
+- An OpenAI-compatible provider exposing Responses API or Chat Completions.
 
 ## Install
 
-Download the latest macOS build from **Releases**, unzip it, and move **Codex Provider Switcher.app** to Applications.
+Download the latest build from **Releases**, unzip it, and move **Codex Provider Switcher.app** to Applications.
 
-The current GitHub release is ad-hoc signed. If macOS blocks the first launch, try opening the app once, then go to **System Settings → Privacy & Security** and choose **Open Anyway** for Codex Provider Switcher.
+The current GitHub release is ad-hoc signed. If macOS blocks first launch, try opening the app once, then go to **System Settings → Privacy & Security** and choose **Open Anyway**.
 
 ## Use
 
-1. Add a provider with its Base URL, model ID, and API key.
-2. Optionally use **Discover Models** to load models from a compatible `/models` endpoint.
-3. Run **Test Connection**. The app probes Responses first, then Chat Completions.
+1. Add a provider with its Base URL, model ID, and API key. The provider name can be left blank and will be generated automatically.
+2. Use **Discover Models** when the provider exposes a compatible `/models` endpoint.
+3. Run **Test Connection**. Responses is probed first; Chat Completions is used as the fallback capability check.
 4. Select **Switch**.
-   - Responses-compatible providers are configured directly in Codex.
-   - Chat-Completions-only providers are exposed through the local Responses bridge automatically.
+   - Native Responses: Codex connects directly.
+   - Chat-Completions-only: **Auto Bridge** routes Codex through localhost automatically. Auto Bridge is on by default.
 5. Relaunch Codex when prompted.
-6. Select **OpenAI → Use OpenAI** to restore the original configuration.
+6. Use the menu bar item for quick provider switching or to reopen the main window.
+7. Select **OpenAI → Use OpenAI** whenever you want to restore the original configuration.
 
-When a provider is using the local bridge, keep Codex Provider Switcher running. Closing the main window is fine; quitting the app stops the localhost bridge.
+A bridged provider requires Codex Provider Switcher to remain running. Closing the main window is safe; the menu bar item keeps the app alive. Quitting the app stops the bridge.
 
-## Base URL discovery
+## Base URL and model discovery
 
-Provider paths are not standardized. The app keeps explicit vendor paths such as `/api/paas/v4`, tries known provider presets where available, and only tries `/v1` as a fallback when the user entered a bare host/root URL. It never replaces an explicit `/v4` or other vendor path with `/v1`.
+Provider URL layouts are not standardized. The app preserves explicit vendor paths such as `/api/paas/v4`, tries known provider presets where appropriate, and only tries `/v1` when the user supplied a bare host/root URL. It never replaces an explicit vendor version path with a guessed `/v1`.
 
-## Local Responses bridge
+Model discovery uses compatible `GET /models` endpoints when available. Manual model entry remains available for providers that do not expose a model catalog.
 
-Current Codex uses Responses-style requests. Many OpenAI-compatible vendors still expose only `/chat/completions`. For those providers, Codex Provider Switcher starts a localhost-only bridge and configures Codex to use it as a Responses endpoint.
+## Auto Bridge
 
-The current bridge focuses on the coding-agent path that can be represented by both APIs:
+Current Codex speaks the OpenAI Responses API, while many compatible providers still expose only Chat Completions. Auto Bridge keeps Codex on a local Responses endpoint and translates requests to the provider's Chat endpoint.
 
-- text messages;
-- standard function tools;
-- function calls and tool outputs;
-- Responses-compatible SSE lifecycle events.
+```text
+Codex
+  ↓ Responses API
+127.0.0.1:<local port>
+  ↓ protocol conversion
+Provider /chat/completions
+```
 
-Hosted OpenAI-only tools, server-managed provider state, and provider-specific reasoning traces are not emulated. Compatibility still depends on the upstream model's function-calling behavior.
+The bridge is localhost-only. Its transformation layer handles normal messages, standard functions, Codex custom/freeform tools, tool search, namespaces, common reasoning text, and usage metadata. It also normalizes strict Chat gateways that reject multiple system messages or malformed tool schemas.
+
+See [docs/BRIDGE.md](docs/BRIDGE.md) for architecture, supported conversions, and deliberate limits.
 
 ## Credential storage
 
-The current GitHub build is ad-hoc signed. macOS Keychain access control tracks application identity through code signing, and rebuilding an ad-hoc app can cause repeated keychain approval prompts. Until releases use a stable Developer ID signature, provider API keys are stored in:
+The GitHub build is currently ad-hoc signed. Rebuilt ad-hoc apps can cause macOS Keychain to ask for access repeatedly, so provider API keys are stored locally at:
 
 ```text
 ~/.codex/provider-switcher/credentials.json
 ```
 
-The file is created with owner-only permissions (`0600`), and the containing state directory uses owner-only access (`0700`). Existing keys from older Keychain-based builds are deliberately not read automatically; paste each provider key once after upgrading.
+The file is owner-only (`0600`) and the state directory is owner-only (`0700`). Older Keychain entries are deliberately not read automatically; paste each provider key once after upgrading from a Keychain-based release.
 
-For direct Responses providers, the active key may still be written to `~/.codex/.env` because the Codex desktop app needs access to the provider credential. For bridged providers, the upstream key remains inside Codex Provider Switcher and Codex talks only to localhost.
+For direct Responses providers, the active key may be written to `~/.codex/.env` so the Codex desktop app can read it. For bridged providers, Codex talks only to localhost and the upstream key remains inside Codex Provider Switcher.
 
 ## Storage and backups
 
-Provider metadata is stored under:
+Provider metadata and app state live under:
 
 ```text
 ~/.codex/provider-switcher/
 ```
 
-Before each configuration change, the app creates a backup in:
+Before configuration changes, backups are created in:
 
 ```text
 ~/.codex/provider-switcher/backups/
 ```
-
-## Provider icons
-
-The app includes compact visual identities for common providers including OpenAI, Anthropic, Google Gemini, DeepSeek, Mistral AI, Qwen, Groq, OpenRouter, Ollama, Perplexity, xAI, Azure OpenAI, Cohere, Moonshot/Kimi, Together AI, SiliconFlow, Zhipu AI, and Volcengine. These are UI identifiers and do not imply affiliation or endorsement.
 
 ## Build with Xcode
 
@@ -107,13 +111,13 @@ Codex Provider Switcher.xcodeproj
 
 Open it in Xcode, select **My Mac**, and build/run the **Codex Provider Switcher** scheme.
 
-For a distributable universal `.app` and zip:
+For a universal `.app` and zip:
 
 ```bash
 ./scripts/build_app.command
 ```
 
-The release version comes from the repository `VERSION` file. The script requires the full Xcode app. Output is written to `dist/` and logs to `.build-app/build.log`.
+The release version comes from `VERSION`. GitHub Actions runs Swift tests and a real Xcode build before release packaging.
 
 ## Tests
 
@@ -121,25 +125,24 @@ The release version comes from the repository `VERSION` file. The script require
 swift test
 ```
 
-GitHub Actions also builds the macOS app with Xcode before a change is merged/released.
-
 ## Project structure
 
 ```text
 Codex Provider Switcher.xcodeproj   Native macOS app project
 Codex Provider Switcher/
   App/                              App lifecycle and state
-  Core/                             Configuration/domain logic
-  Services/                         Credentials, bridge, files, network testing
-  UI/                               SwiftUI views
+  Core/                             Configuration and protocol transformation
+  Services/                         Credentials, bridge, files, networking
+  UI/                               SwiftUI and menu bar UI
   Localization/                     Localization helpers
-  *.lproj/                          Localized strings
 Tests/                              Core unit tests
 scripts/                            Local build/package scripts
 .github/workflows/                  CI and release automation
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for implementation details.
+## Compatibility research
+
+The v0.3.7 bridge review studied the public, MIT-licensed CC Switch project and its mature Codex routing design. Codex Provider Switcher uses an independent native Swift implementation. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Contributing
 

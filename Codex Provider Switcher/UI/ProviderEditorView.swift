@@ -14,6 +14,7 @@ struct ProviderEditorView: View {
     @State private var modelDiscoveryMessage: String?
     @State private var testResult: ConnectionTestReport?
     @State private var applyingDetection = false
+    @State private var saveError: String?
 
     init(profile: ProviderProfile?) {
         original = profile
@@ -97,11 +98,19 @@ struct ProviderEditorView: View {
                             }
                         }
 
+                        if draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(L10n.text("editor.name_generated"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 143)
+                        }
+
                         if let modelDiscoveryMessage {
                             Text(modelDiscoveryMessage)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .padding(.top, 10)
+                                .padding(.top, 8)
                                 .padding(.leading, 143)
                                 .textSelection(.enabled)
                         }
@@ -160,13 +169,14 @@ struct ProviderEditorView: View {
                             fieldRow(L10n.text("field.notes"), alignment: .top) {
                                 TextField(L10n.text("placeholder.notes"), text: $draft.note, axis: .vertical)
                                     .textFieldStyle(.roundedBorder)
-                                    .lineLimit(3...5)
+                                    .lineLimit(2...4)
                             }
                         }
                     }
 
                     if let testResult {
                         ConnectionResultView(report: testResult)
+                            .environmentObject(store)
                     }
                 }
                 .padding(20)
@@ -176,6 +186,14 @@ struct ProviderEditorView: View {
             footer
         }
         .frame(width: 760, height: testResult == nil ? 640 : 750)
+        .alert(L10n.text("editor.save_failed"), isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button(L10n.text("action.ok"), role: .cancel) { saveError = nil }
+        } message: {
+            Text(saveError ?? "")
+        }
         .onAppear {
             showKey = store.preferences.showKeysByDefault
             if let original, original.authentication == .bearer {
@@ -231,20 +249,29 @@ struct ProviderEditorView: View {
                     Label(L10n.text("action.test"), systemImage: "waveform.path.ecg")
                 }
             }
-            .disabled(isTesting)
+            .disabled(isTesting || !canTest)
 
             Spacer()
             Button(L10n.text("action.cancel")) { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button(L10n.text("action.save")) {
-                if store.saveProfile(original: original, draft: draft, apiKey: apiKey) {
-                    dismiss()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
+            Button(L10n.text("action.save")) { save() }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
         }
         .padding(16)
+    }
+
+    private var canTest: Bool {
+        !draft.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        (draft.authentication == .none || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    private var canSave: Bool {
+        !draft.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        (draft.authentication == .none || original != nil || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     @ViewBuilder
@@ -282,6 +309,34 @@ struct ProviderEditorView: View {
         DispatchQueue.main.async { applyingDetection = false }
     }
 
+    private func generatedName() -> String {
+        if draft.brand != .automatic && draft.brand != .custom {
+            return draft.brand.displayName
+        }
+        if let host = URL(string: draft.baseURL)?.host, !host.isEmpty {
+            let parts = host.split(separator: ".")
+            if parts.count >= 2 { return String(parts[parts.count - 2]).capitalized }
+            return host
+        }
+        let model = draft.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        return model.isEmpty ? "Provider" : model
+    }
+
+    private func save() {
+        guard canSave else { return }
+        var candidate = draft
+        if candidate.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            candidate.name = generatedName()
+        }
+        saveError = nil
+        if store.saveProfile(original: original, draft: candidate, apiKey: apiKey) {
+            dismiss()
+        } else {
+            saveError = store.notice?.message ?? L10n.text("editor.save_failed")
+            store.notice = nil
+        }
+    }
+
     private func discoverModels() {
         guard !isDiscoveringModels else { return }
         isDiscoveringModels = true
@@ -300,7 +355,7 @@ struct ProviderEditorView: View {
     }
 
     private func runTest() {
-        guard !isTesting else { return }
+        guard !isTesting, canTest else { return }
         isTesting = true
         testResult = nil
         Task {

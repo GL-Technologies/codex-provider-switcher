@@ -11,6 +11,19 @@ struct SettingsView: View {
                 Button(L10n.text("guide.title")) { store.showAccessSetup() }
             }
 
+            Section(L10n.text("settings.bridge")) {
+                Toggle(L10n.text("bridge.auto"), isOn: Binding(
+                    get: { store.autoBridgeEnabled },
+                    set: { store.setAutoBridgeEnabled($0) }
+                ))
+                Text(L10n.text("settings.bridge_detail"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(L10n.text("bridge.keep_running"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
             Section(L10n.text("settings.credentials")) {
                 Text(L10n.text("settings.credentials_detail"))
                     .font(.callout)
@@ -40,6 +53,6 @@ struct SettingsView: View {
             }
         }
         .padding(12)
-        .frame(width: 680, height: 420)
+        .frame(width: 680, height: 500)
     }
 }

@@ -32,27 +32,48 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 8) {
-                Button {
-                    NotificationCenter.default.post(name: .addProviderRequested, object: nil)
-                } label: {
-                    Image(systemName: "plus")
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .foregroundStyle(store.autoBridgeEnabled ? .green : .secondary)
+                    Text(L10n.text("bridge.auto"))
+                        .font(.caption.weight(.medium))
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { store.autoBridgeEnabled },
+                        set: { store.setAutoBridgeEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .disabled(store.isBusy)
                 }
-                .buttonStyle(.borderless)
-                .help(L10n.text("action.add_provider"))
+                .help(L10n.text("bridge.auto_help"))
 
-                Spacer()
+                Divider()
 
-                Button {
-                    store.showAccessSetup()
-                } label: {
-                    Image(systemName: "questionmark.circle")
+                HStack(spacing: 8) {
+                    Button {
+                        NotificationCenter.default.post(name: .addProviderRequested, object: nil)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(L10n.text("action.add_provider"))
+
+                    Spacer()
+
+                    Button {
+                        store.showAccessSetup()
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(L10n.text("guide.title"))
                 }
-                .buttonStyle(.borderless)
-                .help(L10n.text("guide.title"))
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 9)
             .background(.bar)
         }
     }

@@ -5,7 +5,7 @@ struct CodexProviderSwitcherApp: App {
     @StateObject private var store = AppStore()
 
     var body: some Scene {
-        WindowGroup(L10n.text("app.name")) {
+        WindowGroup(L10n.text("app.name"), id: "main") {
             MainView()
                 .environmentObject(store)
         }
@@ -22,6 +22,14 @@ struct CodexProviderSwitcherApp: App {
                     .keyboardShortcut("r", modifiers: [.command])
             }
         }
+
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(store)
+        } label: {
+            Image(systemName: store.bridgedProfileID != nil ? "arrow.triangle.branch" : "arrow.triangle.2.circlepath")
+        }
+        .menuBarExtraStyle(.menu)
 
         Settings {
             SettingsView()

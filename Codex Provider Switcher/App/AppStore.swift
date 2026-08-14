@@ -7,12 +7,13 @@ final class AppStore: ObservableObject {
     @Published private(set) var profiles: [ProviderProfile] = []
     @Published private(set) var activeProfileID: UUID?
     @Published private(set) var bridgedProfileID: UUID?
+    @Published private(set) var autoBridgeEnabled: Bool
     @Published var notice: AppNotice?
     @Published var shouldOfferRestart = false
     @Published var shouldShowAccessSetup = false
     @Published var isBusy = false
 
-    var preferences = AppPreferences()
+    var preferences: AppPreferences
     let configManager = ConfigManager()
     let keychain = KeychainStore()
     let tester = ConnectionTester()
@@ -22,6 +23,10 @@ final class AppStore: ObservableObject {
     private lazy var repository = ProfileRepository(fileURL: configManager.profilesURL)
 
     init() {
+        let preferences = AppPreferences()
+        self.preferences = preferences
+        self.autoBridgeEnabled = preferences.autoBridgeEnabled
+
         do {
             try configManager.prepareDirectories()
             profiles = repository.load()
@@ -34,6 +39,10 @@ final class AppStore: ObservableObject {
             shouldShowAccessSetup = !preferences.accessSetupCompleted
         } catch {
             notice = AppNotice(title: L10n.text("error.init_title"), message: error.localizedDescription)
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.restoreBridgeIfNeeded()
         }
     }
 
@@ -70,14 +79,26 @@ final class AppStore: ObservableObject {
         shouldShowAccessSetup = true
     }
 
+    func setAutoBridgeEnabled(_ enabled: Bool) {
+        autoBridgeEnabled = enabled
+        preferences.autoBridgeEnabled = enabled
+
+        if !enabled, bridgedProfileID != nil {
+            activateOpenAI()
+        }
+    }
+
     func saveProfile(original: ProviderProfile?, draft: ProviderDraft, apiKey: String) -> Bool {
-        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = draft.model.trimmingCharacters(in: .whitespacesAndNewlines)
         let baseURL = draft.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        var name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !name.isEmpty else { return failSave("error.name_required") }
         guard !model.isEmpty else { return failSave("error.model_required") }
         guard EndpointBuilder.normalizedBaseURL(from: baseURL) != nil else { return failSave("error.url_invalid") }
+
+        if name.isEmpty {
+            name = generatedName(for: draft)
+        }
 
         let cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if draft.authentication == .bearer && cleanKey.isEmpty && original == nil {
@@ -134,9 +155,9 @@ final class AppStore: ObservableObject {
         }
     }
 
-    /// Resolves the provider protocol before writing Codex configuration.
-    /// Responses-compatible providers are used directly. Chat-Completions-only providers
-    /// are transparently routed through the localhost Responses bridge.
+    /// Resolves protocol support before writing Codex configuration.
+    /// Native Responses stays direct. Chat-Completions-only providers use the local bridge
+    /// automatically when Auto Bridge is enabled.
     func activate(_ profile: ProviderProfile) {
         guard !isBusy else { return }
         let apiKey = profile.authentication == .bearer ? keychain.key(for: profile.id) : nil
@@ -156,24 +177,10 @@ final class AppStore: ObservableObject {
                     if let base = report.resolvedBaseURL { resolved.baseURL = base }
                     try configManager.switchToProvider(resolved, apiKey: apiKey)
                 } else if report.success && report.detectedAPI == .chatCompletions {
-                    var upstream = profile
-                    if let base = report.resolvedBaseURL { upstream.baseURL = base }
-                    let localBase = try await bridge.start(profile: upstream, apiKey: apiKey)
-                    let bridged = ProviderProfile(
-                        id: profile.id,
-                        name: profile.name + " Bridge",
-                        model: profile.model,
-                        baseURL: localBase,
-                        brand: profile.brand,
-                        authentication: .none,
-                        reasoningEffort: profile.reasoningEffort,
-                        note: profile.note,
-                        createdAt: profile.createdAt,
-                        updatedAt: Date()
-                    )
-                    try configManager.switchToProvider(bridged, apiKey: nil)
-                    bridgedProfileID = profile.id
-                    notice = AppNotice(title: L10n.text("bridge.enabled_title"), message: L10n.format("bridge.enabled_message", localBase))
+                    guard autoBridgeEnabled else {
+                        throw NSError(domain: "ProviderActivation", code: 2, userInfo: [NSLocalizedDescriptionKey: L10n.text("bridge.off_message")])
+                    }
+                    try await activateThroughBridge(profile, resolvedBaseURL: report.resolvedBaseURL, apiKey: apiKey)
                 } else {
                     throw NSError(domain: "ProviderActivation", code: 1, userInfo: [NSLocalizedDescriptionKey: report.message])
                 }
@@ -282,8 +289,62 @@ final class AppStore: ObservableObject {
         }
     }
 
+    private func activateThroughBridge(_ profile: ProviderProfile, resolvedBaseURL: String?, apiKey: String?) async throws {
+        var upstream = profile
+        if let resolvedBaseURL { upstream.baseURL = resolvedBaseURL }
+        let localBase = try await bridge.start(profile: upstream, apiKey: apiKey)
+        let bridged = ProviderProfile(
+            id: profile.id,
+            name: profile.name + " Bridge",
+            model: profile.model,
+            baseURL: localBase,
+            brand: profile.brand,
+            authentication: .none,
+            reasoningEffort: profile.reasoningEffort,
+            note: profile.note,
+            createdAt: profile.createdAt,
+            updatedAt: Date()
+        )
+        try configManager.switchToProvider(bridged, apiKey: nil)
+        bridgedProfileID = profile.id
+    }
+
+    private func restoreBridgeIfNeeded() async {
+        guard configManager.isManaged(), configManager.isConfiguredForLocalBridge(), let id = activeProfileID, let profile = profile(id: id) else {
+            return
+        }
+
+        guard autoBridgeEnabled else {
+            activateOpenAI()
+            return
+        }
+
+        let apiKey = profile.authentication == .bearer ? keychain.key(for: profile.id) : nil
+        guard profile.authentication == .none || !(apiKey?.isEmpty ?? true) else { return }
+
+        do {
+            try await activateThroughBridge(profile, resolvedBaseURL: nil, apiKey: apiKey)
+            refreshState()
+        } catch {
+            notice = AppNotice(title: L10n.text("error.switch_title"), message: error.localizedDescription)
+        }
+    }
+
+    private func generatedName(for draft: ProviderDraft) -> String {
+        if draft.brand != .automatic && draft.brand != .custom { return draft.brand.displayName }
+        if let host = URL(string: draft.baseURL)?.host, !host.isEmpty {
+            let parts = host.split(separator: ".")
+            if parts.count >= 2 { return String(parts[parts.count - 2]).capitalized }
+            return host
+        }
+        return draft.model.isEmpty ? "Provider" : draft.model
+    }
+
     private func refreshState() {
         activeProfileID = configManager.activeProfileID()
+        if !configManager.isConfiguredForLocalBridge() {
+            bridgedProfileID = nil
+        }
     }
 
     private func sortProfiles() {

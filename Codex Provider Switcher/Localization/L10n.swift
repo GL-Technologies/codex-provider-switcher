@@ -2,6 +2,7 @@ import Foundation
 
 enum L10n {
     static func text(_ key: String) -> String {
+        if let value = RuntimeStrings.value(for: key) { return value }
         if let value = BridgeStrings.value(for: key) { return value }
         if let value = AdaptiveStrings.value(for: key) { return value }
         return NSLocalizedString(key, tableName: "Localizable", bundle: .main, value: key, comment: "")
