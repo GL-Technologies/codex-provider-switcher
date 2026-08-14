@@ -15,6 +15,7 @@ final class AppStore: ObservableObject {
     let configManager = ConfigManager()
     let keychain = KeychainStore()
     let tester = ConnectionTester()
+    let modelDiscovery = ModelDiscoveryService()
     let systemAccess = SystemAccessService()
     private lazy var repository = ProfileRepository(fileURL: configManager.profilesURL)
 
@@ -74,7 +75,7 @@ final class AppStore: ObservableObject {
 
         guard !name.isEmpty else { return failSave("error.name_required") }
         guard !model.isEmpty else { return failSave("error.model_required") }
-        guard EndpointBuilder.responsesURL(from: baseURL) != nil else { return failSave("error.url_invalid") }
+        guard EndpointBuilder.normalizedBaseURL(from: baseURL) != nil else { return failSave("error.url_invalid") }
 
         let cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if draft.authentication == .bearer && cleanKey.isEmpty && original == nil {
@@ -214,6 +215,15 @@ final class AppStore: ObservableObject {
             note: draft.note
         )
         return await tester.test(profile: profile, apiKey: draft.authentication == .bearer ? apiKey : nil)
+    }
+
+    func discoverModels(draft: ProviderDraft, apiKey: String) async -> ModelDiscoveryReport {
+        await modelDiscovery.discover(
+            baseURL: draft.baseURL,
+            brand: draft.resolvedBrand,
+            authentication: draft.authentication,
+            apiKey: draft.authentication == .bearer ? apiKey : nil
+        )
     }
 
     func restartCodex() {
