@@ -8,12 +8,14 @@ final class AppStore: ObservableObject {
     @Published private(set) var activeProfileID: UUID?
     @Published var notice: AppNotice?
     @Published var shouldOfferRestart = false
+    @Published var shouldShowAccessSetup = false
     @Published var isBusy = false
 
     var preferences = AppPreferences()
     let configManager = ConfigManager()
     let keychain = KeychainStore()
     let tester = ConnectionTester()
+    let systemAccess = SystemAccessService()
     private lazy var repository = ProfileRepository(fileURL: configManager.profilesURL)
 
     init() {
@@ -26,6 +28,7 @@ final class AppStore: ObservableObject {
                 keychain.migrateLegacyGlobalKey(to: imported.id)
             }
             refreshState()
+            shouldShowAccessSetup = !preferences.accessSetupCompleted
         } catch {
             notice = AppNotice(title: L10n.text("error.init_title"), message: error.localizedDescription)
         }
@@ -55,6 +58,15 @@ final class AppStore: ObservableObject {
         profile.authentication == .none || keychain.hasKey(for: profile.id)
     }
 
+    func completeAccessSetup() {
+        preferences.accessSetupCompleted = true
+        shouldShowAccessSetup = false
+    }
+
+    func showAccessSetup() {
+        shouldShowAccessSetup = true
+    }
+
     func saveProfile(original: ProviderProfile?, draft: ProviderDraft, apiKey: String) -> Bool {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = draft.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -75,13 +87,22 @@ final class AppStore: ObservableObject {
             original.name = name
             original.model = model
             original.baseURL = baseURL
+            original.brand = draft.brand == .automatic ? ProviderBrand.detected(name: name, baseURL: baseURL) : draft.brand
             original.authentication = draft.authentication
             original.reasoningEffort = draft.reasoningEffort
             original.note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
             original.updatedAt = now
             profile = original
         } else {
-            profile = ProviderProfile(name: name, model: model, baseURL: baseURL, authentication: draft.authentication, reasoningEffort: draft.reasoningEffort, note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines))
+            profile = ProviderProfile(
+                name: name,
+                model: model,
+                baseURL: baseURL,
+                brand: draft.brand,
+                authentication: draft.authentication,
+                reasoningEffort: draft.reasoningEffort,
+                note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
         }
 
         do {
@@ -147,6 +168,7 @@ final class AppStore: ObservableObject {
             name: L10n.format("provider.copy_name", profile.name),
             model: profile.model,
             baseURL: profile.baseURL,
+            brand: profile.brand,
             authentication: profile.authentication,
             reasoningEffort: profile.reasoningEffort,
             note: profile.note
@@ -182,7 +204,15 @@ final class AppStore: ObservableObject {
     }
 
     func test(draft: ProviderDraft, apiKey: String) async -> ConnectionTestReport {
-        let profile = ProviderProfile(name: draft.name, model: draft.model, baseURL: draft.baseURL, authentication: draft.authentication, reasoningEffort: draft.reasoningEffort, note: draft.note)
+        let profile = ProviderProfile(
+            name: draft.name,
+            model: draft.model,
+            baseURL: draft.baseURL,
+            brand: draft.brand,
+            authentication: draft.authentication,
+            reasoningEffort: draft.reasoningEffort,
+            note: draft.note
+        )
         return await tester.test(profile: profile, apiKey: draft.authentication == .bearer ? apiKey : nil)
     }
 
