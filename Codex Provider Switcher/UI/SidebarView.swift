@@ -18,19 +18,41 @@ struct SidebarView: View {
                     warning: false
                 )
                 .tag(SidebarSelection.openAI)
+                .contextMenu {
+                    if !store.isOpenAIActive {
+                        Button {
+                            store.activateOpenAI()
+                        } label: {
+                            Label(L10n.text("action.use_openai"), systemImage: "arrow.uturn.backward")
+                        }
+                        .disabled(store.isBusy)
+                    }
+                }
             }
 
             Section(L10n.text("sidebar.providers")) {
                 ForEach(store.profiles) { profile in
+                    let active = !store.isOpenAIActive && store.activeProfileID == profile.id
                     providerRow(
                         title: profile.name,
                         subtitle: profile.model,
                         brand: profile.resolvedBrand,
-                        active: !store.isOpenAIActive && store.activeProfileID == profile.id,
+                        active: active,
                         warning: !store.hasKey(for: profile)
                     )
                     .tag(SidebarSelection.provider(profile.id))
                     .contextMenu {
+                        if !active && store.hasKey(for: profile) {
+                            Button {
+                                store.activate(profile)
+                            } label: {
+                                Label(L10n.text("action.use"), systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .disabled(store.isBusy)
+
+                            Divider()
+                        }
+
                         Button {
                             onEdit(profile)
                         } label: {
