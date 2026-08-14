@@ -126,8 +126,10 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .help(L10n.text("key.missing"))
             } else if active {
-                AppStatusPill(text: L10n.text("status.active"), tone: .success, systemImage: "checkmark")
-                    .labelStyle(.iconOnly)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .help(L10n.text("status.active"))
             }
         }
         .padding(.vertical, 5)
