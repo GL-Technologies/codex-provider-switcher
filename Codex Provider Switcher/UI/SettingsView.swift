@@ -2,29 +2,13 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var accessStatus: SystemAccessStatus?
 
     var body: some View {
         Form {
             Section(L10n.text("settings.general")) {
                 Toggle(L10n.text("settings.offer_restart"), isOn: $store.preferences.offerRestartAfterSwitch)
                 Toggle(L10n.text("settings.show_keys"), isOn: $store.preferences.showKeysByDefault)
-            }
-
-            Section(L10n.text("access.title")) {
-                LabeledContent(L10n.text("access.codex_access")) {
-                    HStack(spacing: 8) {
-                        Image(systemName: (accessStatus?.canWriteCodexDirectory ?? false) ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle((accessStatus?.canWriteCodexDirectory ?? false) ? .green : .orange)
-                        Text((accessStatus?.canWriteCodexDirectory ?? false) ? L10n.text("access.ready") : L10n.text("access.check_needed"))
-                    }
-                }
-
-                HStack {
-                    Button(L10n.text("access.check")) { refreshAccess() }
-                    Button(L10n.text("access.open_privacy")) { store.systemAccess.openPrivacyAndSecurity() }
-                    Button(L10n.text("access.open_full_disk")) { store.systemAccess.openFullDiskAccess() }
-                }
+                Button(L10n.text("guide.title")) { store.showAccessSetup() }
             }
 
             Section(L10n.text("settings.storage")) {
@@ -49,11 +33,6 @@ struct SettingsView: View {
             }
         }
         .padding(12)
-        .frame(width: 650, height: 420)
-        .onAppear { refreshAccess() }
-    }
-
-    private func refreshAccess() {
-        accessStatus = store.systemAccess.checkCodexDirectoryAccess()
+        .frame(width: 650, height: 330)
     }
 }
