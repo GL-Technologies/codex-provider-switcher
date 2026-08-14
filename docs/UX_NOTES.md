@@ -6,8 +6,9 @@ This document records the interaction-placement rules used by Codex Provider Swi
 
 The sidebar is navigation first. Provider rows navigate to provider details; they do not activate a provider on selection.
 
-Provider-specific secondary commands are exposed through a macOS context menu:
+Provider-specific contextual commands are exposed through a native macOS context menu:
 
+- Use Provider (only when inactive and usable)
 - Edit
 - Duplicate
 - Delete
@@ -16,7 +17,7 @@ The same commands remain discoverable from the app menu bar or the visible detai
 
 The global **Add Provider** command belongs in the window toolbar and the File/New command (`Command-N`), not in the bottom edge of the sidebar.
 
-The sidebar footer is reserved for the persistent Auto Bridge state because it is a global routing preference, not an item-specific action.
+The sidebar footer is reserved for the persistent Auto Bridge state because it is a global routing preference, not an item-specific action. Help may remain there because it is noncritical.
 
 ## Provider detail
 
@@ -28,7 +29,7 @@ The detail header keeps only commands that are directly relevant to the selected
 
 Duplicate and Delete are intentionally removed from the header overflow menu. They are secondary item-management commands and are available from the provider context menu and the macOS Provider menu.
 
-Auto Bridge is not repeated in the detail page. The detail header may show a passive Bridge badge when the selected provider is actively routed through the bridge, while the actual Auto Bridge control has one home in the sidebar.
+Auto Bridge is not repeated in the detail page. The detail page shows passive route/Bridge status only, while the actual Auto Bridge control has one home in the sidebar.
 
 ## Destructive actions
 
