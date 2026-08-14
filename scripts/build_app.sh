@@ -9,6 +9,7 @@ WORK="$ROOT/.build-app"
 DERIVED="$WORK/DerivedData"
 DIST="$ROOT/dist"
 LOG="$WORK/build.log"
+VERSION_FILE="$ROOT/VERSION"
 
 mkdir -p "$WORK" "$DIST"
 : > "$LOG"
@@ -47,6 +48,18 @@ if [[ ! -d "$PROJECT" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$VERSION_FILE" ]]; then
+  echo "Error: VERSION file not found: $VERSION_FILE"
+  exit 1
+fi
+
+MARKETING_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+if [[ -z "$MARKETING_VERSION" ]]; then
+  echo "Error: VERSION is empty."
+  exit 1
+fi
+BUILD_NUMBER="$(printf '%s' "$MARKETING_VERSION" | tr -d '.')"
+
 xcodebuild -version
 
 echo
@@ -54,7 +67,7 @@ echo "Running core tests..."
 swift test --package-path "$ROOT"
 
 echo
-echo "Building universal macOS app..."
+echo "Building Codex Provider Switcher $MARKETING_VERSION (build $BUILD_NUMBER)..."
 rm -rf "$DERIVED"
 xcodebuild \
   -project "$PROJECT" \
@@ -63,6 +76,8 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   ARCHS="arm64 x86_64" \
   ONLY_ACTIVE_ARCH=NO \
+  MARKETING_VERSION="$MARKETING_VERSION" \
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   CODE_SIGNING_ALLOWED=NO \
   build
 
@@ -71,15 +86,16 @@ BUILD_SETTINGS="$(xcodebuild \
   -scheme "$SCHEME" \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED" \
+  MARKETING_VERSION="$MARKETING_VERSION" \
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   CODE_SIGNING_ALLOWED=NO \
   -showBuildSettings)"
 
-MARKETING_VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '/^[[:space:]]*MARKETING_VERSION = / {print $2; exit}')"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '/^[[:space:]]*TARGET_BUILD_DIR = / {print $2; exit}')"
 FULL_PRODUCT_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '/^[[:space:]]*FULL_PRODUCT_NAME = / {print $2; exit}')"
 EXECUTABLE_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '/^[[:space:]]*EXECUTABLE_NAME = / {print $2; exit}')"
 
-if [[ -z "$MARKETING_VERSION" || -z "$TARGET_BUILD_DIR" || -z "$FULL_PRODUCT_NAME" || -z "$EXECUTABLE_NAME" ]]; then
+if [[ -z "$TARGET_BUILD_DIR" || -z "$FULL_PRODUCT_NAME" || -z "$EXECUTABLE_NAME" ]]; then
   echo "Error: could not resolve Xcode build settings."
   exit 1
 fi
@@ -115,6 +131,7 @@ fi
 
 echo
 echo "Build complete"
+echo "Version: $MARKETING_VERSION"
 echo "App: $OUTPUT_APP"
 echo "Zip: $OUTPUT_ZIP"
 echo "Log: $LOG"
