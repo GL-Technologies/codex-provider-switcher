@@ -14,21 +14,11 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 245, max: 300)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 290)
         } detail: {
             detail
         }
-        .frame(minWidth: 820, minHeight: 540)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAdding = true
-                } label: {
-                    Label(L10n.text("action.add_provider"), systemImage: "plus")
-                }
-                .help(L10n.text("action.add_provider"))
-            }
-        }
+        .frame(minWidth: 940, minHeight: 610)
         .sheet(isPresented: $isAdding) {
             ProviderEditorView(profile: nil)
                 .environmentObject(store)
@@ -36,6 +26,11 @@ struct MainView: View {
         .sheet(item: $editingProfile) { profile in
             ProviderEditorView(profile: profile)
                 .environmentObject(store)
+        }
+        .sheet(isPresented: $store.shouldShowAccessSetup) {
+            AccessSetupView()
+                .environmentObject(store)
+                .interactiveDismissDisabled(!store.preferences.accessSetupCompleted)
         }
         .alert(item: $store.notice) { notice in
             Alert(title: Text(notice.title), message: Text(notice.message), dismissButton: .default(Text(L10n.text("action.ok"))))
@@ -68,9 +63,7 @@ struct MainView: View {
         } message: { _ in
             Text(L10n.text("delete.message"))
         }
-        .onAppear {
-            syncSelectionToActiveProfile()
-        }
+        .onAppear { syncSelectionToActiveProfile() }
         .onReceive(NotificationCenter.default.publisher(for: .addProviderRequested)) { _ in
             isAdding = true
         }
@@ -97,10 +90,13 @@ struct MainView: View {
                 .environmentObject(store)
             } else {
                 VStack(spacing: 10) {
-                    Image(systemName: "network.slash").font(.title)
+                    Image(systemName: "network.slash")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
                     Text(L10n.text("provider.not_found"))
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }

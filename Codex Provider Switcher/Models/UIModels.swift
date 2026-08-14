@@ -4,6 +4,7 @@ struct ProviderDraft {
     var name = ""
     var model = ""
     var baseURL = ""
+    var brand: ProviderBrand = .automatic
     var authentication: AuthenticationMode = .bearer
     var reasoningEffort: ReasoningEffort = .automatic
     var note = ""
@@ -14,9 +15,14 @@ struct ProviderDraft {
         name = profile.name
         model = profile.model
         baseURL = profile.baseURL
+        brand = profile.brand
         authentication = profile.authentication
         reasoningEffort = profile.reasoningEffort
         note = profile.note
+    }
+
+    var resolvedBrand: ProviderBrand {
+        brand == .automatic ? ProviderBrand.detected(name: name, baseURL: baseURL) : brand
     }
 }
 

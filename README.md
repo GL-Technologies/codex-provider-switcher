@@ -10,16 +10,18 @@
 
 A native macOS utility for switching Codex between your original OpenAI configuration and multiple OpenAI **Responses API-compatible** providers.
 
-> This project is not affiliated with or endorsed by OpenAI.
+> This project is not affiliated with or endorsed by OpenAI or the provider brands shown in the app.
 
 ## Features
 
 - Save and switch between multiple provider profiles.
-- Restore the original Codex configuration with one click.
+- Built-in visual identities and automatic detection for popular AI providers.
+- Native macOS interface with adaptive light and dark appearances.
 - Keep API keys in macOS Keychain.
 - Test a provider with a real `POST /responses` request before activating it.
+- Restore the original Codex configuration with one click.
 - Back up `~/.codex/config.toml` and `~/.codex/.env` before changes.
-- Works with the Codex desktop app and CLI because both use the same user-level Codex configuration.
+- First-run access check for the local Codex configuration directory.
 - Localized for English, Simplified Chinese, Traditional Chinese, Japanese, Korean, and Spanish.
 
 ## Requirements
@@ -36,14 +38,22 @@ The release build is ad-hoc signed. On first launch, macOS may require **Control
 
 ## Use
 
-1. Open the app.
+1. Open the app and complete the local Codex access check.
 2. Add a provider with a name, Base URL, model ID, and optional API key.
-3. Use **Test** to verify the Responses API endpoint.
-4. Select **Use Provider** to activate it.
-5. Relaunch Codex when prompted.
+3. Choose or auto-detect a provider icon.
+4. Use **Test Connection** to verify the Responses API endpoint.
+5. Select **Switch** to activate the provider and relaunch Codex when prompted.
 6. Select **OpenAI → Use OpenAI** to restore the original configuration.
 
-The app does not delete your OpenAI sign-in credentials. Provider switching can change which conversation history is visible in Codex.
+### macOS permissions
+
+Codex Provider Switcher normally needs only normal access to files in your home directory under `~/.codex` plus macOS Keychain access for provider credentials. **Full Disk Access is not required by default.**
+
+The first-run setup writes and deletes a harmless probe file inside `~/.codex` to confirm access. If that check fails, the app provides shortcuts to **System Settings → Privacy & Security** and **Full Disk Access** as troubleshooting options.
+
+## Provider icons
+
+The app includes compact visual identities for common providers including OpenAI, Anthropic, Google Gemini, DeepSeek, Mistral AI, Qwen, Groq, OpenRouter, Ollama, Perplexity, xAI, Azure OpenAI, Cohere, Moonshot/Kimi, Together AI, SiliconFlow, Zhipu AI, and Volcengine. These are UI identifiers and do not imply affiliation or endorsement.
 
 ## Build with Xcode
 
@@ -61,7 +71,7 @@ For a distributable universal `.app` and zip:
 ./scripts/build_app.command
 ```
 
-The script requires the full Xcode app, not only Command Line Tools. Output is written to `dist/` and logs to `.build-app/build.log`.
+The release version comes from the repository `VERSION` file. The script requires the full Xcode app, not only Command Line Tools. Output is written to `dist/` and logs to `.build-app/build.log`.
 
 ## Tests
 

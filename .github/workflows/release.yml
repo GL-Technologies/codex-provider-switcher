@@ -25,11 +25,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="$(xcodebuild \
-            -project "Codex Provider Switcher.xcodeproj" \
-            -scheme "Codex Provider Switcher" \
-            -configuration Release \
-            -showBuildSettings | awk -F ' = ' '/^[[:space:]]*MARKETING_VERSION = / {print $2; exit}')"
+          VERSION="$(tr -d '[:space:]' < VERSION)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 

@@ -23,6 +23,7 @@ public struct ProviderProfile: Identifiable, Codable, Hashable, Sendable {
     public var name: String
     public var model: String
     public var baseURL: String
+    public var brand: ProviderBrand
     public var authentication: AuthenticationMode
     public var reasoningEffort: ReasoningEffort
     public var note: String
@@ -34,6 +35,7 @@ public struct ProviderProfile: Identifiable, Codable, Hashable, Sendable {
         name: String,
         model: String,
         baseURL: String,
+        brand: ProviderBrand = .automatic,
         authentication: AuthenticationMode = .bearer,
         reasoningEffort: ReasoningEffort = .automatic,
         note: String = "",
@@ -44,6 +46,7 @@ public struct ProviderProfile: Identifiable, Codable, Hashable, Sendable {
         self.name = name
         self.model = model
         self.baseURL = baseURL
+        self.brand = brand == .automatic ? ProviderBrand.detected(name: name, baseURL: baseURL) : brand
         self.authentication = authentication
         self.reasoningEffort = reasoningEffort
         self.note = note
@@ -51,8 +54,12 @@ public struct ProviderProfile: Identifiable, Codable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
+    public var resolvedBrand: ProviderBrand {
+        brand == .automatic ? ProviderBrand.detected(name: name, baseURL: baseURL) : brand
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case id, name, model, baseURL, authentication, reasoningEffort, note, createdAt, updatedAt
+        case id, name, model, baseURL, brand, authentication, reasoningEffort, note, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,6 +68,7 @@ public struct ProviderProfile: Identifiable, Codable, Hashable, Sendable {
         name = try c.decode(String.self, forKey: .name)
         model = try c.decode(String.self, forKey: .model)
         baseURL = try c.decode(String.self, forKey: .baseURL)
+        brand = try c.decodeIfPresent(ProviderBrand.self, forKey: .brand) ?? ProviderBrand.detected(name: name, baseURL: baseURL)
         authentication = try c.decodeIfPresent(AuthenticationMode.self, forKey: .authentication) ?? .bearer
         reasoningEffort = try c.decodeIfPresent(ReasoningEffort.self, forKey: .reasoningEffort) ?? .automatic
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
