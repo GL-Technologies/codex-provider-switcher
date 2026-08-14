@@ -21,9 +21,9 @@ struct ProviderDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 header
-                statusCard
+                routeCard
 
                 Picker("", selection: $section) {
                     Text(L10n.text("details.configuration")).tag(0)
@@ -39,30 +39,31 @@ struct ProviderDetailView: View {
                     testCard
                 }
             }
-            .padding(28)
-            .frame(maxWidth: 900, alignment: .leading)
+            .padding(AppDesign.pagePadding)
+            .frame(maxWidth: AppDesign.pageMaxWidth, alignment: .leading)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppDesign.pageBackground)
     }
 
     private var header: some View {
         HStack(spacing: 16) {
-            ProviderIconView(brand: profile.resolvedBrand, size: 56)
+            ProviderIconView(brand: profile.resolvedBrand, size: 58)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(profile.name)
                         .font(.title2.weight(.semibold))
                     if isActive {
-                        statusBadge(L10n.text("status.active"), color: .green)
+                        AppStatusPill(text: L10n.text("status.active"), tone: .success, systemImage: "checkmark")
                     }
                     if isBridged {
-                        statusBadge(L10n.text("bridge.badge"), color: .orange)
+                        AppStatusPill(text: L10n.text("bridge.badge"), tone: .warning, systemImage: "arrow.triangle.branch")
                     }
                 }
                 Text(profile.model)
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
 
             Spacer()
@@ -104,53 +105,57 @@ struct ProviderDetailView: View {
         }
     }
 
-    private var statusCard: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isBridged ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
-                    .frame(width: 42, height: 42)
-                Image(systemName: isBridged ? "point.3.connected.trianglepath.dotted" : "bolt.horizontal.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(isBridged ? .orange : .green)
-            }
+    private var routeCard: some View {
+        AppCard(padding: 15) {
+            HStack(spacing: 14) {
+                AppIconTile(
+                    systemImage: isBridged ? "point.3.connected.trianglepath.dotted" : (isActive ? "bolt.horizontal.circle.fill" : "network"),
+                    tone: isBridged ? .warning : (isActive ? .success : .neutral),
+                    size: 42
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(isBridged ? L10n.text("bridge.active") : L10n.text("bridge.inactive"))
-                    .font(.headline)
-                Text(isBridged ? L10n.text("bridge.keep_running") : profile.baseURL)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-            }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(routeTitle)
+                        .font(.headline)
+                    Text(routeDetail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                }
 
-            Spacer()
+                Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(L10n.text("bridge.auto"))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Toggle("", isOn: Binding(
-                    get: { store.autoBridgeEnabled },
-                    set: { store.setAutoBridgeEnabled($0) }
-                ))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .disabled(store.isBusy)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(L10n.text("bridge.auto"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Toggle("", isOn: Binding(
+                        get: { store.autoBridgeEnabled },
+                        set: { store.setAutoBridgeEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(store.isBusy)
+                }
             }
-        }
-        .padding(14)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
         }
     }
 
+    private var routeTitle: String {
+        if isBridged { return L10n.text("bridge.active") }
+        if isActive { return L10n.text("bridge.inactive") }
+        return profile.resolvedBrand.displayName
+    }
+
+    private var routeDetail: String {
+        if isBridged { return L10n.text("bridge.keep_running") }
+        return profile.baseURL
+    }
+
     private var configurationCard: some View {
-        card {
+        AppCard {
             Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 0) {
                 detailRow(L10n.text("details.provider"), profile.resolvedBrand.displayName)
                 dividerRow
@@ -178,11 +183,10 @@ struct ProviderDetailView: View {
     }
 
     private var testCard: some View {
-        card {
+        AppCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text(L10n.text("details.connection_test"))
-                        .font(.headline)
+                    AppSectionHeader(title: L10n.text("details.connection_test"))
                     Spacer()
                     Button {
                         runTest()
@@ -203,46 +207,20 @@ struct ProviderDetailView: View {
                     ConnectionResultView(report: testResult)
                         .environmentObject(store)
                 } else {
-                    HStack(spacing: 10) {
-                        Image(systemName: "waveform.path.ecg")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                        Text(L10n.text("test.not_run"))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 22)
+                    AppEmptyState(
+                        systemImage: "waveform.path.ecg",
+                        title: L10n.text("test.not_run")
+                    )
                 }
             }
         }
-    }
-
-    private func statusBadge(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.10), in: Capsule())
-    }
-
-    @ViewBuilder
-    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.50), lineWidth: 1)
-            }
     }
 
     private func detailRow(_ label: String, _ value: String, monospaced: Bool = false) -> some View {
         GridRow {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 140, alignment: .leading)
+                .frame(width: AppDesign.labelColumnWidth, alignment: .leading)
                 .padding(.vertical, 11)
             Group {
                 if monospaced {
