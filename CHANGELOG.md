@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.12
+
+- Fixed OpenAI restore so it sanitizes the current Codex config instead of replacing it with an old baseline, preserving unrelated preferences changed after the first provider switch.
+- Tightened the UI's OpenAI-active state to verify the actual Codex `model_provider` selection instead of treating every unmanaged config as official.
+- Switching to OpenAI now stops the local bridge only after the official configuration has been written and verified successfully.
+- Reworked Codex/ChatGPT restart sequencing to wait for graceful termination, force-terminate only lingering instances, and reopen only after the old process is actually gone.
+- Added regression coverage that unrelated current preferences survive removal of the switcher's provider routing.
+
 ## 0.3.11
 
 - Fixed OpenAI restore when an older saved baseline itself contained a third-party `model_provider`; restore now sanitizes the active provider selection instead of blindly copying the baseline back.

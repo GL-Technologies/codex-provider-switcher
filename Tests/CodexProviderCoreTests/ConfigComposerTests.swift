@@ -106,4 +106,33 @@ final class ConfigComposerTests: XCTestCase {
         XCTAssertTrue(result.contains("[features]"))
         XCTAssertTrue(ConfigComposer.isOpenAIConfig(result))
     }
+
+    func testOpenAIRestorePreservesUnrelatedCurrentPreferences() {
+        let managed = """
+        # Managed by Codex Provider Switcher
+        # Active profile: 11111111-1111-1111-1111-111111111111
+        model = "vendor-model"
+        model_provider = "codex_compat_active"
+        model_reasoning_effort = "high"
+
+        [features]
+        web_search = true
+
+        [ui]
+        language = "zh-CN"
+        compact_mode = false
+
+        [model_providers.codex_compat_active]
+        name = "Vendor"
+        base_url = "http://127.0.0.1:24864/v1"
+        wire_api = "responses"
+        """
+
+        let result = ConfigComposer.buildOpenAIConfig(base: managed)
+        XCTAssertTrue(result.contains("[ui]"))
+        XCTAssertTrue(result.contains("language = \"zh-CN\""))
+        XCTAssertTrue(result.contains("compact_mode = false"))
+        XCTAssertFalse(result.contains("model_provider = \"codex_compat_active\""))
+        XCTAssertTrue(ConfigComposer.isOpenAIConfig(result))
+    }
 }
