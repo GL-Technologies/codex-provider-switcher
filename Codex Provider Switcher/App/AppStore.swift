@@ -47,7 +47,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    var isOpenAIActive: Bool { !configManager.isManaged() }
+    var isOpenAIActive: Bool { configManager.isOpenAIConfigured() }
 
     var activeProfile: ProviderProfile? {
         guard let activeProfileID else { return nil }
@@ -204,9 +204,12 @@ final class AppStore: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do {
+            // First make the Codex configuration official. Only after the write and verification
+            // succeed do we tear down the bridge. This avoids leaving the user without a working
+            // route when restore fails halfway through.
+            try configManager.switchToOpenAI()
             bridge.stop()
             bridgedProfileID = nil
-            try configManager.switchToOpenAI()
             refreshState()
             offerRestartIfEnabled()
         } catch {
@@ -238,9 +241,9 @@ final class AppStore: ObservableObject {
     func delete(_ profile: ProviderProfile) {
         do {
             if activeProfileID == profile.id && configManager.isManaged() {
+                try configManager.switchToOpenAI()
                 bridge.stop()
                 bridgedProfileID = nil
-                try configManager.switchToOpenAI()
                 offerRestartIfEnabled()
             }
             profiles.removeAll { $0.id == profile.id }
@@ -286,11 +289,33 @@ final class AppStore: ObservableObject {
         let running = workspace.runningApplications.filter { app in
             app.localizedName == "Codex" || app.localizedName == "ChatGPT"
         }
-        let appURLs = running.compactMap(\.bundleURL)
-        running.forEach { $0.terminate() }
+        let appURLs = Array(Set(running.compactMap(\.bundleURL)))
 
         guard !appURLs.isEmpty else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+
+        Task { @MainActor in
+            for app in running where !app.isTerminated {
+                _ = app.terminate()
+            }
+
+            // Wait for a clean shutdown before reopening. The previous fixed 1.2 second delay
+            // could relaunch while the old process was still alive, leaving it on the previous
+            // provider configuration. Give graceful termination a few seconds, then force only
+            // the instances that are still running.
+            for _ in 0..<30 {
+                if running.allSatisfy(\.isTerminated) { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+
+            for app in running where !app.isTerminated {
+                _ = app.forceTerminate()
+            }
+
+            for _ in 0..<20 {
+                if running.allSatisfy(\.isTerminated) { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+
             let configuration = NSWorkspace.OpenConfiguration()
             for url in appURLs {
                 workspace.openApplication(at: url, configuration: configuration) { _, _ in }
@@ -350,6 +375,12 @@ final class AppStore: ObservableObject {
     }
 
     private func refreshState() {
+        if configManager.isOpenAIConfigured() {
+            activeProfileID = nil
+            bridgedProfileID = nil
+            return
+        }
+
         activeProfileID = configManager.activeProfileID()
         if !configManager.isConfiguredForLocalBridge() {
             bridgedProfileID = nil
