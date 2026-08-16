@@ -125,15 +125,17 @@ final class ConfigManager {
 
         let metadata = loadBaselineMetadata()
 
-        // Prefer the original baseline when available, but sanitize it instead of restoring
-        // byte-for-byte. Older releases could capture a third-party configuration as the
-        // baseline, which caused the app UI to report OpenAI while Codex still used that route.
+        // Restore from the CURRENT config first, not the historical baseline. Codex itself may
+        // update unrelated preferences (for example UI/language preferences) while a provider is
+        // active. Replacing the whole file with an old baseline silently rolls those preferences
+        // back. The composer removes only the active custom-provider routing keys and leaves the
+        // rest of the current configuration untouched.
         let sourceConfig: String
-        if metadata?.configExisted == true,
-           FileManager.default.fileExists(atPath: baselineConfigURL.path),
-           let text = try? String(contentsOf: baselineConfigURL, encoding: .utf8) {
+        if let text = try? String(contentsOf: configURL, encoding: .utf8) {
             sourceConfig = text
-        } else if let text = try? String(contentsOf: configURL, encoding: .utf8) {
+        } else if metadata?.configExisted == true,
+                  FileManager.default.fileExists(atPath: baselineConfigURL.path),
+                  let text = try? String(contentsOf: baselineConfigURL, encoding: .utf8) {
             sourceConfig = text
         } else {
             sourceConfig = ""
@@ -146,12 +148,14 @@ final class ConfigManager {
             try atomicWrite(officialConfig + "\n", to: configURL, permissions: 0o600)
         }
 
+        // Same rule for .env: strip only the key managed by this app from the CURRENT file so
+        // unrelated environment variables added after the original baseline are preserved.
         let sourceEnv: String
-        if metadata?.envExisted == true,
-           FileManager.default.fileExists(atPath: baselineEnvURL.path),
-           let text = try? String(contentsOf: baselineEnvURL, encoding: .utf8) {
+        if let text = try? String(contentsOf: envURL, encoding: .utf8) {
             sourceEnv = text
-        } else if let text = try? String(contentsOf: envURL, encoding: .utf8) {
+        } else if metadata?.envExisted == true,
+                  FileManager.default.fileExists(atPath: baselineEnvURL.path),
+                  let text = try? String(contentsOf: baselineEnvURL, encoding: .utf8) {
             sourceEnv = text
         } else {
             sourceEnv = ""
