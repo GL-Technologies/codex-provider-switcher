@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.13
+
+- Fixed direct provider calls failing with `Missing environment variable: CODEX_COMPAT_API_KEY` after a successful in-app connection test.
+- Direct Responses-compatible providers now use Codex's command-backed bearer-token authentication instead of relying on the Codex desktop process inheriting a custom environment variable.
+- Runtime bearer tokens are written only to an owner-only `runtime-credentials` directory under the switcher's private state folder and are read by Codex through `/bin/cat`; switching providers or restoring OpenAI clears the runtime token files.
+- Legacy `CODEX_COMPAT_API_KEY` entries are removed from `~/.codex/.env` when a provider is activated or OpenAI is restored.
+- Bridge routes remain keyless from Codex's point of view because the switcher itself authenticates to the upstream Chat Completions provider.
+- Added regression coverage for command-backed provider auth and managed auth-block cleanup.
+
 ## 0.3.12
 
 - Fixed OpenAI restore so it sanitizes the current Codex config instead of replacing it with an old baseline, preserving unrelated preferences changed after the first provider switch.
