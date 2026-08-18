@@ -14,6 +14,7 @@ final class ConfigManager {
     private let baselineEnvURL: URL
     private let baselineMetadataURL: URL
     private let activeStateURL: URL
+    private let runtimeCredentialURL: URL
 
     private let legacyManagerURL: URL
     private let legacySwitcherURL: URL
@@ -34,6 +35,7 @@ final class ConfigManager {
         baselineEnvURL = stateURL.appendingPathComponent("baseline.env")
         baselineMetadataURL = stateURL.appendingPathComponent("baseline.json")
         activeStateURL = stateURL.appendingPathComponent("active.json")
+        runtimeCredentialURL = stateURL.appendingPathComponent("runtime-credentials", isDirectory: true)
 
         legacyManagerURL = codexURL.appendingPathComponent("interface-manager", isDirectory: true)
         legacySwitcherURL = codexURL.appendingPathComponent("interface-switcher", isDirectory: true)
@@ -49,8 +51,10 @@ final class ConfigManager {
         try FileManager.default.createDirectory(at: codexURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: stateURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: backupURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: runtimeCredentialURL, withIntermediateDirectories: true)
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: stateURL.path)
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: backupURL.path)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: runtimeCredentialURL.path)
         try migrateFromV31IfNeeded()
         try migrateFromV2IfNeeded()
     }
@@ -60,9 +64,6 @@ final class ConfigManager {
         return text.contains(ConfigComposer.managedMarker) || ConfigComposer.legacyManagedMarkers.contains { text.contains($0) }
     }
 
-    /// Returns true only when the current top-level Codex provider selection resolves to
-    /// OpenAI/ChatGPT defaults. This is intentionally stricter than `!isManaged()` because
-    /// an unmanaged config can still select a third-party provider.
     func isOpenAIConfigured() -> Bool {
         guard FileManager.default.fileExists(atPath: configURL.path) else { return true }
         guard let text = try? String(contentsOf: configURL, encoding: .utf8) else { return false }
@@ -88,11 +89,13 @@ final class ConfigManager {
 
     func switchToProvider(_ profile: ProviderProfile, apiKey: String?) throws {
         try prepareDirectories()
+
+        let cleanKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
         if profile.authentication == .bearer {
-            guard let apiKey, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard let cleanKey, !cleanKey.isEmpty else {
                 throw NSError(domain: "ConfigManager", code: 1, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.missing_key")])
             }
-            guard !apiKey.contains("\n") && !apiKey.contains("\r") else {
+            guard !cleanKey.contains("\n") && !cleanKey.contains("\r") else {
                 throw NSError(domain: "ConfigManager", code: 2, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.key_newline")])
             }
         }
@@ -104,13 +107,32 @@ final class ConfigManager {
             throw NSError(domain: "ConfigManager", code: 3, userInfo: [NSLocalizedDescriptionKey: L10n.text("error.missing_baseline")])
         }
 
-        let baselineConfig = try baselineText(url: baselineConfigURL, existed: loadBaselineMetadata()?.configExisted ?? false)
-        let config = ConfigComposer.buildConfig(base: baselineConfig, profile: profile)
+        try clearRuntimeCredentials()
+        var credentialArguments: [String] = []
+        var credentialCommand: String?
+        if profile.authentication == .bearer, let cleanKey {
+            let tokenURL = runtimeCredentialURL.appendingPathComponent("\(profile.id.uuidString.lowercased()).token")
+            try atomicWrite(cleanKey + "\n", to: tokenURL, permissions: 0o600)
+            credentialCommand = "/bin/cat"
+            credentialArguments = [tokenURL.path]
+        }
+
+        // Build from the current config so unrelated Codex preferences are retained while the
+        // previous managed provider block/model keys are replaced.
+        let currentConfig = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+        let config = ConfigComposer.buildConfig(
+            base: currentConfig,
+            profile: profile,
+            credentialCommandPath: credentialCommand,
+            credentialCommandArguments: credentialArguments
+        )
         try atomicWrite(config, to: configURL, permissions: 0o600)
 
-        let baselineEnv = try baselineText(url: baselineEnvURL, existed: loadBaselineMetadata()?.envExisted ?? false)
-        let env = ConfigComposer.buildEnvironment(base: baselineEnv, apiKey: profile.authentication == .bearer ? apiKey : nil)
-        if env.isEmpty && !(loadBaselineMetadata()?.envExisted ?? false) {
+        // Remove legacy environment-key material. New direct providers use Codex's supported
+        // command-backed bearer-token auth, and bridge providers require no Codex-side key.
+        let currentEnv = (try? String(contentsOf: envURL, encoding: .utf8)) ?? ""
+        let env = ConfigComposer.buildEnvironment(base: currentEnv, apiKey: nil)
+        if env.isEmpty {
             try? FileManager.default.removeItem(at: envURL)
         } else {
             try atomicWrite(env, to: envURL, permissions: 0o600)
@@ -122,14 +144,8 @@ final class ConfigManager {
     func switchToOpenAI() throws {
         try prepareDirectories()
         try backupCurrent(reason: "restore")
-
         let metadata = loadBaselineMetadata()
 
-        // Restore from the CURRENT config first, not the historical baseline. Codex itself may
-        // update unrelated preferences (for example UI/language preferences) while a provider is
-        // active. Replacing the whole file with an old baseline silently rolls those preferences
-        // back. The composer removes only the active custom-provider routing keys and leaves the
-        // rest of the current configuration untouched.
         let sourceConfig: String
         if let text = try? String(contentsOf: configURL, encoding: .utf8) {
             sourceConfig = text
@@ -148,8 +164,6 @@ final class ConfigManager {
             try atomicWrite(officialConfig + "\n", to: configURL, permissions: 0o600)
         }
 
-        // Same rule for .env: strip only the key managed by this app from the CURRENT file so
-        // unrelated environment variables added after the original baseline are preserved.
         let sourceEnv: String
         if let text = try? String(contentsOf: envURL, encoding: .utf8) {
             sourceEnv = text
@@ -167,26 +181,16 @@ final class ConfigManager {
         } else {
             try atomicWrite(officialEnv, to: envURL, permissions: 0o600)
         }
+        try clearRuntimeCredentials()
 
         guard isOpenAIConfigured() else {
-            throw NSError(
-                domain: "ConfigManager",
-                code: 7,
-                userInfo: [NSLocalizedDescriptionKey: "Codex configuration still selects a custom model provider after restore."]
-            )
+            throw NSError(domain: "ConfigManager", code: 7, userInfo: [NSLocalizedDescriptionKey: "Codex configuration still selects a custom model provider after restore."])
         }
-
         try saveActiveState(ActiveState(mode: "openai", profileID: nil, updatedAt: Date()))
     }
 
-    func revealCodexFolder() {
-        NSWorkspace.shared.activateFileViewerSelecting([configURL])
-    }
-
-    func revealBackupFolder() {
-        NSWorkspace.shared.open(backupURL)
-    }
-
+    func revealCodexFolder() { NSWorkspace.shared.activateFileViewerSelecting([configURL]) }
+    func revealBackupFolder() { NSWorkspace.shared.open(backupURL) }
     func codexPath() -> String { codexURL.path }
     func backupPath() -> String { backupURL.path }
 
@@ -194,35 +198,18 @@ final class ConfigManager {
         let modelURL = legacySwitcherURL.appendingPathComponent("model.txt")
         let baseURL = legacySwitcherURL.appendingPathComponent("base_url.txt")
         guard let model = try? String(contentsOf: modelURL, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty,
-              let base = try? String(contentsOf: baseURL, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !base.isEmpty else {
-            return nil
-        }
-        let effortRaw = ((try? String(contentsOf: legacySwitcherURL.appendingPathComponent("reasoning_effort.txt"), encoding: .utf8)) ?? "automatic")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return ProviderProfile(
-            name: "Imported Provider",
-            model: model,
-            baseURL: base,
-            authentication: .bearer,
-            reasoningEffort: ReasoningEffort(rawValue: effortRaw) ?? .automatic
-        )
+              let base = try? String(contentsOf: baseURL, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !base.isEmpty else { return nil }
+        let effortRaw = ((try? String(contentsOf: legacySwitcherURL.appendingPathComponent("reasoning_effort.txt"), encoding: .utf8)) ?? "automatic").trimmingCharacters(in: .whitespacesAndNewlines)
+        return ProviderProfile(name: "Imported Provider", model: model, baseURL: base, authentication: .bearer, reasoningEffort: ReasoningEffort(rawValue: effortRaw) ?? .automatic)
     }
 
     private func captureBaseline() throws {
         let configExists = FileManager.default.fileExists(atPath: configURL.path)
         let envExists = FileManager.default.fileExists(atPath: envURL.path)
-
-        if configExists {
-            try atomicWrite(Data(contentsOf: configURL), to: baselineConfigURL, permissions: 0o600)
-        } else {
-            try? FileManager.default.removeItem(at: baselineConfigURL)
-        }
-        if envExists {
-            try atomicWrite(Data(contentsOf: envURL), to: baselineEnvURL, permissions: 0o600)
-        } else {
-            try? FileManager.default.removeItem(at: baselineEnvURL)
-        }
-
+        if configExists { try atomicWrite(Data(contentsOf: configURL), to: baselineConfigURL, permissions: 0o600) }
+        else { try? FileManager.default.removeItem(at: baselineConfigURL) }
+        if envExists { try atomicWrite(Data(contentsOf: envURL), to: baselineEnvURL, permissions: 0o600) }
+        else { try? FileManager.default.removeItem(at: baselineEnvURL) }
         let metadata = BaselineMetadata(configExisted: configExists, envExisted: envExists, capturedAt: Date())
         try atomicWrite(try encoder.encode(metadata), to: baselineMetadataURL, permissions: 0o600)
     }
@@ -231,71 +218,45 @@ final class ConfigManager {
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let folder = backupURL.appendingPathComponent("\(stamp)-\(reason)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: configURL.path) {
-            try FileManager.default.copyItem(at: configURL, to: folder.appendingPathComponent("config.toml"))
-        }
-        if FileManager.default.fileExists(atPath: envURL.path) {
-            try FileManager.default.copyItem(at: envURL, to: folder.appendingPathComponent(".env"))
-        }
+        if FileManager.default.fileExists(atPath: configURL.path) { try FileManager.default.copyItem(at: configURL, to: folder.appendingPathComponent("config.toml")) }
+        if FileManager.default.fileExists(atPath: envURL.path) { try FileManager.default.copyItem(at: envURL, to: folder.appendingPathComponent(".env")) }
     }
 
-    private func baselineText(url: URL, existed: Bool) throws -> String {
-        guard existed else { return "" }
-        return try String(contentsOf: url, encoding: .utf8)
+    private func clearRuntimeCredentials() throws {
+        guard FileManager.default.fileExists(atPath: runtimeCredentialURL.path) else { return }
+        for item in try FileManager.default.contentsOfDirectory(at: runtimeCredentialURL, includingPropertiesForKeys: nil) {
+            try? FileManager.default.removeItem(at: item)
+        }
     }
 
     private func loadBaselineMetadata() -> BaselineMetadata? {
         guard let data = try? Data(contentsOf: baselineMetadataURL) else { return nil }
         return try? decoder.decode(BaselineMetadata.self, from: data)
     }
-
     private func loadActiveState() -> ActiveState? {
         guard let data = try? Data(contentsOf: activeStateURL) else { return nil }
         return try? decoder.decode(ActiveState.self, from: data)
     }
-
     private func saveActiveState(_ state: ActiveState) throws {
         try atomicWrite(try encoder.encode(state), to: activeStateURL, permissions: 0o600)
     }
 
-    private func atomicWrite(_ text: String, to url: URL, permissions: Int) throws {
-        try atomicWrite(Data(text.utf8), to: url, permissions: permissions)
-    }
-
+    private func atomicWrite(_ text: String, to url: URL, permissions: Int) throws { try atomicWrite(Data(text.utf8), to: url, permissions: permissions) }
     private func atomicWrite(_ data: Data, to url: URL, permissions: Int) throws {
         let temp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         try data.write(to: temp, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: temp.path)
-        if FileManager.default.fileExists(atPath: url.path) {
-            _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)
-        } else {
-            try FileManager.default.moveItem(at: temp, to: url)
-        }
+        if FileManager.default.fileExists(atPath: url.path) { _ = try FileManager.default.replaceItemAt(url, withItemAt: temp) }
+        else { try FileManager.default.moveItem(at: temp, to: url) }
         try? FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: url.path)
     }
 
     private func migrateFromV31IfNeeded() throws {
         guard FileManager.default.fileExists(atPath: legacyManagerURL.path) else { return }
-        let mappings = [
-            ("profiles.json", profilesURL),
-            ("baseline.config.toml", baselineConfigURL),
-            ("baseline.env", baselineEnvURL),
-            ("baseline.json", baselineMetadataURL),
-            ("active.json", activeStateURL)
-        ]
+        let mappings = [("profiles.json", profilesURL), ("baseline.config.toml", baselineConfigURL), ("baseline.env", baselineEnvURL), ("baseline.json", baselineMetadataURL), ("active.json", activeStateURL)]
         for (name, destination) in mappings where !FileManager.default.fileExists(atPath: destination.path) {
             let source = legacyManagerURL.appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: source.path) {
-                try FileManager.default.copyItem(at: source, to: destination)
-            }
-        }
-
-        let oldBackups = legacyManagerURL.appendingPathComponent("backups", isDirectory: true)
-        if let items = try? FileManager.default.contentsOfDirectory(at: oldBackups, includingPropertiesForKeys: nil),
-           (try? FileManager.default.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil).isEmpty) == true {
-            for item in items {
-                try? FileManager.default.copyItem(at: item, to: backupURL.appendingPathComponent(item.lastPathComponent))
-            }
+            if FileManager.default.fileExists(atPath: source.path) { try FileManager.default.copyItem(at: source, to: destination) }
         }
     }
 
@@ -304,18 +265,12 @@ final class ConfigManager {
         let configFlagURL = legacySwitcherURL.appendingPathComponent("official.config.exists")
         let envFlagURL = legacySwitcherURL.appendingPathComponent("official.env.exists")
         guard FileManager.default.fileExists(atPath: configFlagURL.path), FileManager.default.fileExists(atPath: envFlagURL.path) else { return }
-
         let configFlag = ((try? String(contentsOf: configFlagURL, encoding: .utf8)) ?? "0").trimmingCharacters(in: .whitespacesAndNewlines) == "1"
         let envFlag = ((try? String(contentsOf: envFlagURL, encoding: .utf8)) ?? "0").trimmingCharacters(in: .whitespacesAndNewlines) == "1"
-
         let oldConfig = legacySwitcherURL.appendingPathComponent("official.config.toml")
         let oldEnv = legacySwitcherURL.appendingPathComponent("official.env")
-        if configFlag, FileManager.default.fileExists(atPath: oldConfig.path) {
-            try atomicWrite(Data(contentsOf: oldConfig), to: baselineConfigURL, permissions: 0o600)
-        }
-        if envFlag, FileManager.default.fileExists(atPath: oldEnv.path) {
-            try atomicWrite(Data(contentsOf: oldEnv), to: baselineEnvURL, permissions: 0o600)
-        }
+        if configFlag, FileManager.default.fileExists(atPath: oldConfig.path) { try atomicWrite(Data(contentsOf: oldConfig), to: baselineConfigURL, permissions: 0o600) }
+        if envFlag, FileManager.default.fileExists(atPath: oldEnv.path) { try atomicWrite(Data(contentsOf: oldEnv), to: baselineEnvURL, permissions: 0o600) }
         let metadata = BaselineMetadata(configExisted: configFlag, envExisted: envFlag, capturedAt: Date())
         try atomicWrite(try encoder.encode(metadata), to: baselineMetadataURL, permissions: 0o600)
     }
