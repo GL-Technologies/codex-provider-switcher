@@ -12,7 +12,11 @@ public enum ConfigComposer {
         "# Managed by Codex Interface Switcher"
     ]
 
-    public static func buildConfig(base: String, profile: ProviderProfile) -> String {
+    public static func buildConfig(
+        base: String,
+        profile: ProviderProfile,
+        credentialCommandPath: String? = nil
+    ) -> String {
         let cleanBase = stripManagedContent(from: base)
         let normalizedBaseURL = EndpointBuilder.normalizedBaseURL(from: profile.baseURL)?.absoluteString ?? profile.baseURL
         var lines: [String] = [
@@ -35,10 +39,25 @@ public enum ConfigComposer {
         lines.append("[model_providers.\(providerID)]")
         lines.append("name = \"\(tomlEscape(profile.name.isEmpty ? providerDisplayName : profile.name))\"")
         lines.append("base_url = \"\(tomlEscape(normalizedBaseURL))\"")
-        if profile.authentication == .bearer {
+
+        // Prefer Codex's command-backed bearer-token support when the app can provide a
+        // credential helper. This avoids depending on the desktop process importing a custom
+        // environment variable. The bridge route uses `.none` authentication and therefore
+        // intentionally has no Codex-side credential configuration at all.
+        if profile.authentication == .bearer, credentialCommandPath == nil {
             lines.append("env_key = \"\(keyEnvironment)\"")
         }
         lines.append("wire_api = \"responses\"")
+
+        if profile.authentication == .bearer, let credentialCommandPath {
+            lines.append("")
+            lines.append("[model_providers.\(providerID).auth]")
+            lines.append("command = \"\(tomlEscape(credentialCommandPath))\"")
+            lines.append("args = [\"\(tomlEscape(profile.id.uuidString.lowercased()))\"]")
+            lines.append("refresh_interval_ms = 0")
+            lines.append("timeout_ms = 5000")
+        }
+
         lines.append("")
         return lines.joined(separator: "\n")
     }
@@ -81,9 +100,6 @@ public enum ConfigComposer {
                 if isAssignment(trimmed, key: "model_provider") {
                     continue
                 }
-                // If the saved baseline explicitly selected a third-party provider, its model
-                // and reasoning settings belong to that route as well. Remove them so Codex can
-                // fall back to the signed-in OpenAI/ChatGPT defaults.
                 if hadCustomProvider && (isAssignment(trimmed, key: "model") || isAssignment(trimmed, key: "model_reasoning_effort")) {
                     continue
                 }
@@ -105,6 +121,14 @@ public enum ConfigComposer {
             return true
         }
         return officialProviderIDs.contains(provider)
+    }
+
+    public static func managedConfigUsesEnvironmentKey(_ text: String) -> Bool {
+        guard text.contains("[model_providers.\(providerID)]") else { return false }
+        return text.components(separatedBy: .newlines).contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return isAssignment(trimmed, key: "env_key") && trimmed.contains(keyEnvironment)
+        }
     }
 
     public static func buildEnvironment(base: String, apiKey: String?) -> String {
