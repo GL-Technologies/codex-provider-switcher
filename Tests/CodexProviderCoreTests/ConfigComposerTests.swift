@@ -30,10 +30,32 @@ final class ConfigComposerTests: XCTestCase {
         XCTAssertFalse(result.contains("model = \"old\""))
     }
 
+    func testCommandBackedAuthOmitsEnvironmentKey() {
+        let profile = ProviderProfile(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            name: "Vendor A",
+            model: "model-a",
+            baseURL: "https://example.com/v1",
+            authentication: .bearer
+        )
+        let tokenPath = "/Users/test/.codex/provider-switcher/runtime-credentials/token.file"
+        let result = ConfigComposer.buildConfig(
+            base: "",
+            profile: profile,
+            credentialCommandPath: "/bin/cat",
+            credentialCommandArguments: [tokenPath]
+        )
+        XCTAssertFalse(result.contains("env_key"))
+        XCTAssertTrue(result.contains("[model_providers.codex_compat_active.auth]"))
+        XCTAssertTrue(result.contains("command = \"/bin/cat\""))
+        XCTAssertTrue(result.contains("args = [\"\(tokenPath)\"]"))
+    }
+
     func testNoAuthenticationOmitsEnvKey() {
         let profile = ProviderProfile(name: "Local", model: "local", baseURL: "http://127.0.0.1:8000/v1", authentication: .none)
         let result = ConfigComposer.buildConfig(base: "", profile: profile)
         XCTAssertFalse(result.contains("env_key"))
+        XCTAssertFalse(result.contains(".auth]"))
     }
 
     func testEnvironmentReplacesManagedKey() {
@@ -97,12 +119,17 @@ final class ConfigComposerTests: XCTestCase {
         name = "Vendor"
         base_url = "http://127.0.0.1:24864/v1"
         wire_api = "responses"
+
+        [model_providers.codex_compat_active.auth]
+        command = "/bin/cat"
+        args = ["/tmp/token"]
         """
 
         let result = ConfigComposer.buildOpenAIConfig(base: managed)
         XCTAssertFalse(result.contains(ConfigComposer.managedMarker))
         XCTAssertFalse(result.contains(ConfigComposer.activeMarkerPrefix))
         XCTAssertFalse(result.contains("codex_compat_active"))
+        XCTAssertFalse(result.contains("/tmp/token"))
         XCTAssertTrue(result.contains("[features]"))
         XCTAssertTrue(ConfigComposer.isOpenAIConfig(result))
     }
