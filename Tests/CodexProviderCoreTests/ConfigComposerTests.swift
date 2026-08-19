@@ -27,6 +27,8 @@ final class ConfigComposerTests: XCTestCase {
         XCTAssertTrue(result.contains("[features]"))
         XCTAssertTrue(result.contains("web_search = true"))
         XCTAssertTrue(result.contains("env_key = \"CODEX_COMPAT_API_KEY\""))
+        XCTAssertTrue(result.contains("requires_openai_auth = false"))
+        XCTAssertTrue(result.contains("supports_websockets = false"))
         XCTAssertFalse(result.contains("model = \"old\""))
     }
 
@@ -49,6 +51,7 @@ final class ConfigComposerTests: XCTestCase {
         XCTAssertTrue(result.contains("[model_providers.codex_compat_active.auth]"))
         XCTAssertTrue(result.contains("command = \"/bin/cat\""))
         XCTAssertTrue(result.contains("args = [\"\(tokenPath)\"]"))
+        XCTAssertTrue(result.contains("requires_openai_auth = false"))
     }
 
     func testNoAuthenticationOmitsEnvKey() {
@@ -56,6 +59,7 @@ final class ConfigComposerTests: XCTestCase {
         let result = ConfigComposer.buildConfig(base: "", profile: profile)
         XCTAssertFalse(result.contains("env_key"))
         XCTAssertFalse(result.contains(".auth]"))
+        XCTAssertTrue(result.contains("requires_openai_auth = false"))
     }
 
     func testEnvironmentReplacesManagedKey() {
