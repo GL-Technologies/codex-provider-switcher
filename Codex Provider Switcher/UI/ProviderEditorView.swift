@@ -13,7 +13,6 @@ struct ProviderEditorView: View {
     @State private var discoveredModels: [String] = []
     @State private var modelDiscoveryMessage: String?
     @State private var testResult: ConnectionTestReport?
-    @State private var applyingDetection = false
     @State private var saveError: String?
 
     init(profile: ProviderProfile?) {
@@ -211,9 +210,7 @@ struct ProviderEditorView: View {
             }
             clearDetectionResults()
         }
-        .onChange(of: draft.baseURL) { _ in
-            if !applyingDetection { clearDetectionResults() }
-        }
+        .onChange(of: draft.baseURL) { _ in clearDetectionResults() }
         .onChange(of: draft.model) { _ in testResult = nil }
         .onChange(of: draft.authentication) { _ in clearDetectionResults() }
         .onChange(of: apiKey) { _ in clearDetectionResults() }
@@ -302,13 +299,6 @@ struct ProviderEditorView: View {
         modelDiscoveryMessage = nil
     }
 
-    private func adoptResolvedBaseURL(_ baseURL: String?) {
-        guard let baseURL, baseURL != draft.baseURL else { return }
-        applyingDetection = true
-        draft.baseURL = baseURL
-        DispatchQueue.main.async { applyingDetection = false }
-    }
-
     private func generatedName() -> String {
         if draft.brand != .automatic && draft.brand != .custom {
             return draft.brand.displayName
@@ -343,7 +333,9 @@ struct ProviderEditorView: View {
         modelDiscoveryMessage = nil
         Task {
             let report = await store.discoverModels(draft: draft, apiKey: apiKey)
-            adoptResolvedBaseURL(report.resolvedBaseURL)
+            // Discovery may need to query a provider-specific alternate endpoint (for example
+            // Zhipu's /api/paas/v4 models route while the user intentionally entered /api/v1
+            // for Responses). Never rewrite the user's Base URL based on model discovery.
             discoveredModels = report.models
             modelDiscoveryMessage = report.message
             if draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -360,7 +352,9 @@ struct ProviderEditorView: View {
         testResult = nil
         Task {
             let report = await store.test(draft: draft, apiKey: apiKey)
-            adoptResolvedBaseURL(report.resolvedBaseURL)
+            // Keep the Base URL the user entered. The activation path uses report.resolvedBaseURL
+            // transiently when selecting Direct Responses vs Auto Bridge, so the editor does not
+            // need to mutate a stored profile just because an alternate route was detected.
             testResult = report
             isTesting = false
         }

@@ -204,9 +204,6 @@ final class AppStore: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do {
-            // First make the Codex configuration official. Only after the write and verification
-            // succeed do we tear down the bridge. This avoids leaving the user without a working
-            // route when restore fails halfway through.
             try configManager.switchToOpenAI()
             bridge.stop()
             bridgedProfileID = nil
@@ -284,25 +281,25 @@ final class AppStore: ObservableObject {
         )
     }
 
+    /// Restarts the actual Codex Desktop bundle and opens a fresh thread afterwards.
+    ///
+    /// Codex Desktop records the model provider on a thread when that thread is created.
+    /// Reopening an older OpenAI thread after switching the global config can therefore keep
+    /// the old provider binding. Starting a new thread after the restart makes the new
+    /// `model_provider` selection effective without modifying Codex's local thread database.
     func restartCodex() {
         let workspace = NSWorkspace.shared
         let running = workspace.runningApplications.filter { app in
-            app.localizedName == "Codex" || app.localizedName == "ChatGPT"
+            app.bundleIdentifier == "com.openai.codex"
         }
         let appURLs = Array(Set(running.compactMap(\.bundleURL)))
-
-        guard !appURLs.isEmpty else { return }
 
         Task { @MainActor in
             for app in running where !app.isTerminated {
                 _ = app.terminate()
             }
 
-            // Wait for a clean shutdown before reopening. The previous fixed 1.2 second delay
-            // could relaunch while the old process was still alive, leaving it on the previous
-            // provider configuration. Give graceful termination a few seconds, then force only
-            // the instances that are still running.
-            for _ in 0..<30 {
+            for _ in 0..<40 {
                 if running.allSatisfy(\.isTerminated) { break }
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
@@ -317,8 +314,29 @@ final class AppStore: ObservableObject {
             }
 
             let configuration = NSWorkspace.OpenConfiguration()
+            if appURLs.isEmpty {
+                // The URL scheme is registered by Codex Desktop and also launches the app if it
+                // is currently closed.
+                if let newThreadURL = URL(string: "codex://threads/new") {
+                    workspace.open(newThreadURL)
+                }
+                return
+            }
+
             for url in appURLs {
-                workspace.openApplication(at: url, configuration: configuration) { _, _ in }
+                await withCheckedContinuation { continuation in
+                    workspace.openApplication(at: url, configuration: configuration) { _, _ in
+                        continuation.resume()
+                    }
+                }
+            }
+
+            // Give the newly launched app a brief moment to register its URL handler before
+            // requesting a fresh thread. This avoids resuming a stale thread whose provider was
+            // captured before the switch.
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            if let newThreadURL = URL(string: "codex://threads/new") {
+                workspace.open(newThreadURL)
             }
         }
     }

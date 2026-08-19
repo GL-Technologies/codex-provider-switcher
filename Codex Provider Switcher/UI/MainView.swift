@@ -18,6 +18,7 @@ struct MainView: View {
         NavigationSplitView {
             SidebarView(
                 selection: $selection,
+                onAdd: { isAdding = true },
                 onEdit: edit,
                 onDuplicate: duplicate,
                 onDelete: requestDelete
@@ -27,16 +28,6 @@ struct MainView: View {
             detail
         }
         .frame(minWidth: 980, idealWidth: 1120, minHeight: 650, idealHeight: 720)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAdding = true
-                } label: {
-                    Label(L10n.text("action.add_provider"), systemImage: "plus")
-                }
-                .help(L10n.text("action.add_provider"))
-            }
-        }
         .sheet(isPresented: $isAdding) {
             ProviderEditorView(profile: nil)
                 .environmentObject(store)
