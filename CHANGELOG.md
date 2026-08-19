@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.14
+
+- Added protocol-aware endpoint discovery so native OpenAI Responses and Chat Completions can use different Base URLs for the same provider/model.
+- Native Responses is always probed first and used directly when it succeeds; Auto Bridge is only used when Responses is unavailable and Chat Completions succeeds.
+- Added Zhipu AI split endpoint presets: `https://open.bigmodel.cn/api/v1` for OpenAI Responses and `https://open.bigmodel.cn/api/paas/v4` for OpenAI Chat Completions.
+- Selecting Zhipu now defaults to its native Responses Base URL, while users who paste the Chat Completions URL are automatically probed against the native Responses route as well.
+- Model discovery now probes provider-specific model roots instead of assuming every protocol shares one Base URL.
+- Added `glm-5.3` to the Zhipu model suggestions and regression tests for split protocol routing.
+
 ## 0.3.13
 
 - Fixed direct provider calls failing with `Missing environment variable: CODEX_COMPAT_API_KEY` after a successful in-app connection test.

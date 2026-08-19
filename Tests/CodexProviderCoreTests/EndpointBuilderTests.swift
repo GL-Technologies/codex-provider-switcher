@@ -32,16 +32,51 @@ final class EndpointBuilderTests: XCTestCase {
     }
 
     func testRootHostCandidatesIncludeV1Fallback() {
-        let candidates = EndpointBuilder.candidateBaseURLs(from: "https://aiapi.example.com")
-            .map(\.absoluteString)
+        let candidates = EndpointBuilder.candidateBaseURLs(
+            from: "https://aiapi.example.com",
+            family: .responses
+        ).map(\.absoluteString)
         XCTAssertEqual(candidates, ["https://aiapi.example.com", "https://aiapi.example.com/v1"])
     }
 
     func testExistingV4PathIsPreserved() {
-        let candidates = EndpointBuilder.candidateBaseURLs(from: "https://open.bigmodel.cn/api/paas/v4", brand: .zhipu)
-            .map(\.absoluteString)
+        let candidates = EndpointBuilder.candidateBaseURLs(
+            from: "https://open.bigmodel.cn/api/paas/v4",
+            brand: .zhipu,
+            family: .chatCompletions
+        ).map(\.absoluteString)
         XCTAssertEqual(candidates.first, "https://open.bigmodel.cn/api/paas/v4")
         XCTAssertFalse(candidates.contains("https://open.bigmodel.cn/api/paas/v4/v1"))
+    }
+
+    func testZhipuResponsesCandidatesAddNativeResponsesBaseEvenWhenChatBaseWasEntered() {
+        let candidates = EndpointBuilder.candidateBaseURLs(
+            from: "https://open.bigmodel.cn/api/paas/v4",
+            brand: .zhipu,
+            family: .responses
+        ).map(\.absoluteString)
+
+        XCTAssertEqual(candidates.first, "https://open.bigmodel.cn/api/paas/v4")
+        XCTAssertTrue(candidates.contains("https://open.bigmodel.cn/api/v1"))
+    }
+
+    func testZhipuChatCandidatesAddNativeChatBaseEvenWhenResponsesBaseWasEntered() {
+        let candidates = EndpointBuilder.candidateBaseURLs(
+            from: "https://open.bigmodel.cn/api/v1",
+            brand: .zhipu,
+            family: .chatCompletions
+        ).map(\.absoluteString)
+
+        XCTAssertEqual(candidates.first, "https://open.bigmodel.cn/api/v1")
+        XCTAssertTrue(candidates.contains("https://open.bigmodel.cn/api/paas/v4"))
+    }
+
+    func testZhipuDefaultBasePrefersNativeResponses() {
+        XCTAssertEqual(ProviderPreset.baseURL(for: .zhipu), "https://open.bigmodel.cn/api/v1")
+        XCTAssertEqual(
+            ProviderPreset.baseURLs(for: .zhipu, family: .chatCompletions),
+            ["https://open.bigmodel.cn/api/paas/v4"]
+        )
     }
 
     func testModelsPathIsNormalized() {

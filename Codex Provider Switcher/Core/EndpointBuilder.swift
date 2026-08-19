@@ -26,17 +26,24 @@ public enum EndpointBuilder {
         return components.url
     }
 
-    /// Returns conservative Base URL candidates, ordered from most explicit to inferred.
-    /// Explicit paths are never replaced. For known vendors we prefer their documented
-    /// path, then try /v1 only when the user entered a host/root URL.
-    public static func candidateBaseURLs(from rawURL: String, brand: ProviderBrand = .automatic) -> [URL] {
+    /// Returns Base URL candidates for a particular protocol family.
+    ///
+    /// The user's explicit URL is always tried first. For known providers we then add
+    /// documented protocol-specific roots. This matters for vendors such as Zhipu, where
+    /// Chat Completions and Responses intentionally live under different Base URLs.
+    /// Finally, `/v1` is inferred only from a bare host/root URL.
+    public static func candidateBaseURLs(
+        from rawURL: String,
+        brand: ProviderBrand = .automatic,
+        family: ProviderEndpointFamily
+    ) -> [URL] {
         guard let normalized = normalizedBaseURL(from: rawURL) else { return [] }
         var candidates: [URL] = []
 
         func append(_ url: URL?) {
             guard let url else { return }
-            let canonical = url.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            guard !candidates.contains(where: { $0.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == canonical }) else { return }
+            let canonical = canonicalString(url)
+            guard !candidates.contains(where: { canonicalString($0) == canonical }) else { return }
             candidates.append(url)
         }
 
@@ -45,9 +52,10 @@ public enum EndpointBuilder {
         let resolvedBrand = brand == .automatic
             ? ProviderBrand.detected(name: "", baseURL: normalized.absoluteString)
             : brand
-        if let preset = ProviderPreset.baseURL(for: resolvedBrand),
-           let presetURL = normalizedBaseURL(from: preset),
-           presetURL.host?.lowercased() == normalized.host?.lowercased() {
+
+        for preset in ProviderPreset.baseURLs(for: resolvedBrand, family: family) {
+            guard let presetURL = normalizedBaseURL(from: preset),
+                  presetURL.host?.lowercased() == normalized.host?.lowercased() else { continue }
             append(presetURL)
         }
 
@@ -57,6 +65,12 @@ public enum EndpointBuilder {
         }
 
         return candidates
+    }
+
+    /// Backward-compatible generic candidates. Prefer protocol-specific overloads for
+    /// connection testing and model discovery.
+    public static func candidateBaseURLs(from rawURL: String, brand: ProviderBrand = .automatic) -> [URL] {
+        candidateBaseURLs(from: rawURL, brand: brand, family: .responses)
     }
 
     public static func responsesURL(from baseURL: String) -> URL? {
@@ -101,5 +115,9 @@ public enum EndpointBuilder {
         path = (path.isEmpty || path == "/") ? suffix : path + suffix
         components.path = path
         return components.url
+    }
+
+    private static func canonicalString(_ url: URL) -> String {
+        url.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 }

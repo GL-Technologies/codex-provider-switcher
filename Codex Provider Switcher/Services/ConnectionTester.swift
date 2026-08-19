@@ -12,8 +12,17 @@ actor ConnectionTester {
     }
 
     func test(profile: ProviderProfile, apiKey: String?) async -> ConnectionTestReport {
-        let candidates = EndpointBuilder.candidateBaseURLs(from: profile.baseURL, brand: profile.resolvedBrand)
-        guard !candidates.isEmpty else {
+        let responseCandidates = EndpointBuilder.candidateBaseURLs(
+            from: profile.baseURL,
+            brand: profile.resolvedBrand,
+            family: .responses
+        )
+        let chatCandidates = EndpointBuilder.candidateBaseURLs(
+            from: profile.baseURL,
+            brand: profile.resolvedBrand,
+            family: .chatCompletions
+        )
+        guard !responseCandidates.isEmpty || !chatCandidates.isEmpty else {
             return failure(titleKey: "test.invalid", messageKey: "test.invalid_url", endpoint: profile.baseURL)
         }
 
@@ -27,6 +36,9 @@ actor ConnectionTester {
             }
         }
 
+        // Native Responses is always preferred. A provider may expose Chat Completions and
+        // Responses under different Base URLs (for example Zhipu), so the two protocols must
+        // not share one candidate list.
         let responsesBody: [String: Any] = [
             "model": model,
             "input": "Reply with OK.",
@@ -34,7 +46,7 @@ actor ConnectionTester {
         ]
 
         var responseAttempts: [Attempt] = []
-        for base in candidates {
+        for base in responseCandidates {
             guard let endpoint = EndpointBuilder.responsesURL(from: base) else { continue }
             let attempt = await perform(baseURL: base, endpoint: endpoint, body: responsesBody, profile: profile, apiKey: apiKey)
             responseAttempts.append(attempt)
@@ -54,6 +66,9 @@ actor ConnectionTester {
             }
         }
 
+        // Only fall back to Chat Completions after all native Responses candidates fail.
+        // A successful Chat route is usable through Auto Bridge, but it should never replace
+        // a working native Responses route.
         let chatBody: [String: Any] = [
             "model": model,
             "messages": [["role": "user", "content": "Reply with OK."]],
@@ -62,7 +77,7 @@ actor ConnectionTester {
         ]
 
         var chatAttempts: [Attempt] = []
-        for base in candidates {
+        for base in chatCandidates {
             guard let endpoint = EndpointBuilder.chatCompletionsURL(from: base) else { continue }
             let attempt = await perform(baseURL: base, endpoint: endpoint, body: chatBody, profile: profile, apiKey: apiKey)
             chatAttempts.append(attempt)
@@ -109,7 +124,7 @@ actor ConnectionTester {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("CodexProviderSwitcher/0.3.5", forHTTPHeaderField: "User-Agent")
+        request.setValue("CodexProviderSwitcher/0.3.14", forHTTPHeaderField: "User-Agent")
         if profile.authentication == .bearer, let apiKey {
             request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
         }
