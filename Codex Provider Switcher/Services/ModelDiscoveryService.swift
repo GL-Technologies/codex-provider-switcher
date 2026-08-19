@@ -2,7 +2,11 @@ import Foundation
 
 actor ModelDiscoveryService {
     func discover(baseURL: String, brand: ProviderBrand, authentication: AuthenticationMode, apiKey: String?) async -> ModelDiscoveryReport {
-        let candidates = EndpointBuilder.candidateBaseURLs(from: baseURL, brand: brand)
+        let candidates = EndpointBuilder.candidateBaseURLs(
+            from: baseURL,
+            brand: brand,
+            family: .models
+        )
         guard !candidates.isEmpty else {
             return ModelDiscoveryReport(models: [], resolvedBaseURL: nil, endpoint: nil, message: L10n.text("models.invalid_url"))
         }
@@ -20,7 +24,7 @@ actor ModelDiscoveryService {
             request.httpMethod = "GET"
             request.timeoutInterval = 12
             request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue("CodexProviderSwitcher/0.3.5", forHTTPHeaderField: "User-Agent")
+            request.setValue("CodexProviderSwitcher/0.3.14", forHTTPHeaderField: "User-Agent")
             if authentication == .bearer, let apiKey {
                 request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
             }
