@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @EnvironmentObject private var store: AppStore
     @Binding var selection: SidebarSelection
+    let onAdd: () -> Void
     let onEdit: (ProviderProfile) -> Void
     let onDuplicate: (ProviderProfile) -> Void
     let onDelete: (ProviderProfile) -> Void
@@ -79,6 +80,7 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 9) {
+                addProviderButton
                 bridgeControl
 
                 HStack {
@@ -100,6 +102,24 @@ struct SidebarView: View {
             .padding(.bottom, 10)
             .background(.bar)
         }
+    }
+
+    private var addProviderButton: some View {
+        Button(action: onAdd) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.body.weight(.semibold))
+                Text(L10n.text("action.add_provider"))
+                    .font(.callout.weight(.medium))
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .disabled(store.isBusy)
+        .help(L10n.text("action.add_provider"))
     }
 
     private var bridgeControl: some View {
