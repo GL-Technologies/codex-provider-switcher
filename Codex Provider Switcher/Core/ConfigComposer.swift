@@ -44,6 +44,11 @@ public enum ConfigComposer {
             lines.append("env_key = \"\(keyEnvironment)\"")
         }
         lines.append("wire_api = \"responses\"")
+        // The switcher manages upstream credentials independently from the user's ChatGPT
+        // session. Be explicit so Codex Desktop never treats a third-party model as a model
+        // that should be authenticated with the signed-in ChatGPT account.
+        lines.append("requires_openai_auth = false")
+        lines.append("supports_websockets = false")
 
         if profile.authentication == .bearer, let credentialCommandPath {
             lines.append("")
